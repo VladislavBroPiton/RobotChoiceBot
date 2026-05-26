@@ -26,6 +26,8 @@
             --toggle-off: #ccc;
             --toggle-on: #2b5278;
             --button-secondary: #f8f9fa;
+            --tooltip-bg: #333;
+            --tooltip-text: #fff;
         }
         
         /* ========== ТЁМНАЯ ТЕМА ========== */
@@ -47,6 +49,8 @@
             --toggle-off: #444;
             --toggle-on: #00f0ff;
             --button-secondary: #2a2a4a;
+            --tooltip-bg: #555;
+            --tooltip-text: #fff;
         }
         
         body {
@@ -123,6 +127,7 @@
             align-items: center;
             gap: 6px;
             transition: all 0.2s;
+            position: relative;
         }
         
         .filter-btn:hover {
@@ -170,7 +175,9 @@
             flex: 1;
         }
         
+        /* Стили для кнопок фильтров с подсказками */
         .status-filter-btn {
+            position: relative;
             padding: 4px 10px;
             border-radius: 16px;
             border: 1px solid var(--border);
@@ -189,6 +196,40 @@
             background: var(--accent);
             color: white;
             border-color: var(--accent);
+        }
+        
+        /* Подсказка (tooltip) */
+        .status-filter-btn:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 8px;
+            padding: 6px 12px;
+            background: var(--tooltip-bg);
+            color: var(--tooltip-text);
+            font-size: 11px;
+            font-weight: normal;
+            white-space: nowrap;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        /* Маленькая стрелочка у подсказки */
+        .status-filter-btn:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 2px;
+            border: 5px solid transparent;
+            border-top-color: var(--tooltip-bg);
+            z-index: 100;
+            pointer-events: none;
         }
         
         .filter-clear {
@@ -558,11 +599,11 @@
                 <div class="filter-row">
                     <span class="filter-label">📌 Статус:</span>
                     <div class="status-filter" id="statusFilter">
-                        <button class="status-filter-btn active" data-status="all">Все</button>
-                        <button class="status-filter-btn" data-status="первое сообщение">🆕 Первое</button>
-                        <button class="status-filter-btn" data-status="ожидание менеджера">📞 Ожидание</button>
-                        <button class="status-filter-btn" data-status="в работе">⚙️ В работе</button>
-                        <button class="status-filter-btn" data-status="закрыт">✅ Закрыт</button>
+                        <button class="status-filter-btn active" data-status="all" data-tooltip="Показать все чаты без фильтрации">Все</button>
+                        <button class="status-filter-btn" data-status="первое сообщение" data-tooltip="Клиент только написал первое сообщение, ответа оператора ещё не было">🆕 Первое</button>
+                        <button class="status-filter-btn" data-status="ожидание менеджера" data-tooltip="Клиент ожидает ответа от менеджера (обычно после запроса консультации)">📞 Ожидание</button>
+                        <button class="status-filter-btn" data-status="в работе" data-tooltip="Менеджер взял чат в работу, диалог активен">⚙️ В работе</button>
+                        <button class="status-filter-btn" data-status="закрыт" data-tooltip="Диалог завершён, клиент получил решение или отказ">✅ Закрыт</button>
                     </div>
                     <span class="filter-clear" id="clearFilterBtn">✕ сбросить</span>
                 </div>
@@ -723,7 +764,7 @@
                     currentStatusFilter = btn.dataset.status;
                     updateFilterBadge();
                     loadChats();
-                    // Закрываем панель после применения фильтра (опционально)
+                    // Закрываем панель после применения фильтра
                     if (filterPanelVisible) {
                         toggleFilterPanel();
                     }
