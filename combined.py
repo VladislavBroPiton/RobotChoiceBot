@@ -12,12 +12,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncpg
-import pandas as pd
+import csv
 from io import StringIO, BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 import aiogram
 from aiogram import Bot, Dispatcher, types
@@ -431,6 +431,94 @@ async def toggle_auto(chat_id: int):
     await db.toggle_auto_mode(chat_id)
     return {"status": "toggled"}
 
+@app.post("/api/chats/{chat_id}/mark-read")
+async def mark_read(chat_id: int):
+    """Отметить чат как прочитанный"""
+    return {"status": "ok"}
+
+# ==================== ЭКСПОРТ CSV (без pandas) ====================
+@app.get("/api/export/csv")
+async def export_csv(chat_id: int = None):
+    """Экспорт чатов в CSV"""
+    from io import StringIO
+    from datetime import datetime
+    
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID чата", "ID пользователя", "Имя", "Статус", "Авторежим", "Дата создания", "Последнее сообщение"])
+    
+    if chat_id:
+        chat = await db.get_chat_by_id(chat_id)
+        if chat:
+            writer.writerow([
+                chat['id'], chat['user_id'], chat.get('full_name', ''),
+                chat.get('dialog_status', ''), chat.get('auto_mode', ''),
+                chat.get('created_at', ''), chat.get('last_message_at', '')
+            ])
+    else:
+        chats = await db.get_all_chats(limit=1000)
+        for chat in chats:
+            writer.writerow([
+                chat['id'], chat['user_id'], chat.get('full_name', ''),
+                chat.get('dialog_status', ''), chat.get('auto_mode', ''),
+                chat.get('created_at', ''), chat.get('last_message_at', '')
+            ])
+    
+    response = StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=chats_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+    )
+    return response
+
+# ==================== ЭКСПОРТ PDF ====================
+@app.get("/api/export/pdf")
+async def export_pdf(chat_id: int = None):
+    """Экспорт чатов в PDF"""
+    from datetime import datetime
+    from io import BytesIO
+    
+    buffer = BytesIO()
+    
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Заголовок
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#2b5278'))
+    story.append(Paragraph("RobotChoiceBot CRM - Отчёт по чатам", title_style))
+    story.append(Spacer(1, 0.2*inch))
+    
+    # Получаем данные
+    if chat_id:
+        chat = await db.get_chat_by_id(chat_id)
+        data = [[chat['id'], chat['user_id'], chat.get('full_name', ''), chat.get('dialog_status', '')]]
+    else:
+        chats = await db.get_all_chats(limit=500)
+        data = [[c['id'], c['user_id'], c.get('full_name', ''), c.get('dialog_status', '')] for c in chats]
+    
+    # Таблица
+    table = Table([["ID чата", "ID пользователя", "Имя", "Статус"]] + data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.grey),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('GRID', (0,0), (-1,-1), 1, colors.black)
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 0.2*inch))
+    story.append(Paragraph(f"Всего записей: {len(data)}", styles['Normal']))
+    
+    doc.build(story)
+    buffer.seek(0)
+    
+    response = StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=chats_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"}
+    )
+    return response
+
 # ==================== ВЕБ-ДАШБОРД ====================
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
@@ -595,6 +683,17 @@ with open("templates/dashboard.html", "w") as f:
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+        .toggle-auto-btn {
+            background: #2b5278;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .toggle-auto-btn.off {
+            background: #888;
+        }
     </style>
 </head>
 <body>
@@ -615,8 +714,15 @@ with open("templates/dashboard.html", "w") as f:
             <div class="messages-header">
                 <div><strong id="chatName"></strong></div>
                 <div style="display: flex; gap: 12px; align-items: center;">
-                    <select id="statusSelect" class="status-select"></select>
-                    <button id="toggleAutoBtn" class="status-select"></button>
+                    <select id="statusSelect" class="status-select">
+                        <option value="первое сообщение">первое сообщение</option>
+                        <option value="ожидание менеджера">ожидание менеджера</option>
+                        <option value="в работе">в работе</option>
+                        <option value="закрыт">закрыт</option>
+                    </select>
+                    <button id="toggleAutoBtn" class="toggle-auto-btn">Авторежим ВКЛ</button>
+                    <a href="/api/export/csv" class="status-select" style="text-decoration: none;">📥 CSV</a>
+                    <a href="/api/export/pdf" class="status-select" style="text-decoration: none;">📄 PDF</a>
                 </div>
             </div>
             <div class="messages-container" id="messagesContainer"></div>
@@ -665,15 +771,12 @@ with open("templates/dashboard.html", "w") as f:
             const chatRes = await fetch(`/api/chats/${chatId}`);
             const chat = await chatRes.json();
             document.getElementById('chatName').innerText = chat.full_name || chat.username || 'User';
-            document.getElementById('statusSelect').innerHTML = `
-                <option value="первое сообщение" ${chat.dialog_status === 'первое сообщение' ? 'selected' : ''}>первое сообщение</option>
-                <option value="ожидание менеджера" ${chat.dialog_status === 'ожидание менеджера' ? 'selected' : ''}>ожидание менеджера</option>
-                <option value="в работе" ${chat.dialog_status === 'в работе' ? 'selected' : ''}>в работе</option>
-                <option value="закрыт" ${chat.dialog_status === 'закрыт' ? 'selected' : ''}>закрыт</option>
-            `;
+            document.getElementById('statusSelect').value = chat.dialog_status || 'первое сообщение';
             
             currentAutoMode = chat.auto_mode;
-            document.getElementById('toggleAutoBtn').innerHTML = currentAutoMode ? '🔧 Авторежим ВКЛ' : '🔧 Авторежим ВЫКЛ';
+            const autoBtn = document.getElementById('toggleAutoBtn');
+            autoBtn.textContent = currentAutoMode ? 'Авторежим ВКЛ' : 'Авторежим ВЫКЛ';
+            autoBtn.className = currentAutoMode ? 'toggle-auto-btn' : 'toggle-auto-btn off';
             
             document.getElementById('messagesArea').style.display = 'flex';
             
@@ -696,11 +799,17 @@ with open("templates/dashboard.html", "w") as f:
             
             container.innerHTML = data.messages.map(msg => `
                 <div class="message ${msg.sender_type}">
-                    ${msg.message_text || '[Сообщение]'}
+                    ${escapeHtml(msg.message_text || '[Сообщение]')}
                     <div class="message-time">${new Date(msg.timestamp).toLocaleTimeString()}</div>
                 </div>
             `).join('');
             container.scrollTop = container.scrollHeight;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
         
         async function sendMessage() {
@@ -740,7 +849,9 @@ with open("templates/dashboard.html", "w") as f:
             
             if (res.ok) {
                 currentAutoMode = !currentAutoMode;
-                document.getElementById('toggleAutoBtn').innerHTML = currentAutoMode ? '🔧 Авторежим ВКЛ' : '🔧 Авторежим ВЫКЛ';
+                const autoBtn = document.getElementById('toggleAutoBtn');
+                autoBtn.textContent = currentAutoMode ? 'Авторежим ВКЛ' : 'Авторежим ВЫКЛ';
+                autoBtn.className = currentAutoMode ? 'toggle-auto-btn' : 'toggle-auto-btn off';
             }
         }
         
