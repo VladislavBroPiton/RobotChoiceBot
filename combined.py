@@ -524,6 +524,78 @@ async def export_pdf(chat_id: int = None):
 async def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
+# ==================== ШАБЛОНЫ ОТВЕТОВ ====================
+templates_storage = []
+
+@app.get("/api/templates")
+async def get_templates():
+    """Получить список шаблонов"""
+    return {"templates": templates_storage}
+
+@app.post("/api/templates")
+async def create_template(request: Request):
+    """Создать новый шаблон"""
+    data = await request.json()
+    title = data.get("title")
+    text = data.get("text")
+    
+    if not title or not text:
+        raise HTTPException(status_code=400, detail="Title and text are required")
+    
+    template_id = len(templates_storage) + 1
+    templates_storage.append({
+        "id": template_id,
+        "title": title,
+        "text": text,
+        "created_at": datetime.now().isoformat()
+    })
+    return {"id": template_id, "title": title, "text": text}
+
+# ==================== ЭКСПОРТ ПО ПЕРИОДУ ====================
+@app.get("/api/export/period")
+async def export_period(from_date: str, to_date: str):
+    """Экспорт чатов за период в CSV"""
+    from io import StringIO
+    from datetime import datetime
+    
+    try:
+        date_from = datetime.strptime(from_date, "%Y-%m-%d")
+        date_to = datetime.strptime(to_date, "%Y-%m-%d")
+    except:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+    
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID чата", "ID пользователя", "Имя", "Статус", "Авторежим", "Создан", "Последнее сообщение"])
+    
+    chats = await db.get_all_chats(limit=5000)
+    filtered_chats = []
+    
+    for chat in chats:
+        created_at = chat.get('created_at')
+        if created_at:
+            if isinstance(created_at, datetime):
+                created_date = created_at.date()
+            else:
+                created_date = datetime.fromisoformat(str(created_at)).date()
+            
+            if date_from.date() <= created_date <= date_to.date():
+                filtered_chats.append(chat)
+    
+    for chat in filtered_chats:
+        writer.writerow([
+            chat['id'], chat['user_id'], chat.get('full_name', ''),
+            chat.get('dialog_status', ''), chat.get('auto_mode', ''),
+            chat.get('created_at', ''), chat.get('last_message_at', '')
+        ])
+    
+    response = StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=chats_{from_date}_{to_date}.csv"}
+    )
+    return response
+
 # ==================== ЗАПУСК ====================
 if __name__ == "__main__":
     import uvicorn
