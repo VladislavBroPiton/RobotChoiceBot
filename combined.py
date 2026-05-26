@@ -28,7 +28,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
 # ==================== НАСТРОЙКИ ====================
-BOT_TOKEN = "7234417726:AAGAtpErgSscHqZaEMbmQnFRsBqT5IcvYLg"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = [5683729883]
 DATABASE_URL = "postgresql://neondb_owner:npg_ZS6yvHDEwa1G@ep-winter-dust-al1pbd4y.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require"
 
