@@ -105,6 +105,44 @@
             border-bottom: 1px solid var(--border);
             font-weight: 600;
             color: var(--text-primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .filter-section {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-primary);
+        }
+        
+        .status-filter {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .status-filter-btn {
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        .status-filter-btn:hover {
+            background: var(--accent-light);
+        }
+        
+        .status-filter-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
         }
         
         .chats-list {
@@ -153,6 +191,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
         }
         
         .selected-chat-name {
@@ -175,6 +215,7 @@
             border-radius: 12px;
             word-wrap: break-word;
             font-size: 14px;
+            position: relative;
         }
         
         .message.user {
@@ -251,7 +292,7 @@
             color: var(--text-primary);
         }
         
-        .toggle-auto-btn {
+        .toggle-auto-btn, .templates-btn {
             background: var(--accent);
             color: white;
             border: none;
@@ -263,6 +304,16 @@
         
         .toggle-auto-btn.off {
             background: var(--toggle-off);
+        }
+        
+        .templates-btn {
+            background: var(--button-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        
+        .templates-btn:hover {
+            background: var(--accent-light);
         }
         
         .empty-state {
@@ -278,6 +329,7 @@
         .export-buttons {
             display: flex;
             gap: 8px;
+            align-items: center;
         }
         
         .export-link {
@@ -294,6 +346,119 @@
         .export-link:hover {
             background: var(--accent-light);
             border-color: var(--accent);
+        }
+        
+        .date-input {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+        
+        /* Модальное окно шаблонов */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .modal-close {
+            cursor: pointer;
+            font-size: 24px;
+            color: var(--text-muted);
+        }
+        
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .template-item {
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-primary);
+        }
+        
+        .template-item:hover {
+            border-color: var(--accent);
+            background: var(--accent-light);
+        }
+        
+        .template-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .template-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .add-template-form {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .add-template-form input, .add-template-form textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        
+        .add-template-btn {
+            width: 100%;
+            padding: 10px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -312,6 +477,18 @@
     <div class="main-content">
         <div class="chats-sidebar">
             <div class="chats-header">📋 Чаты</div>
+            
+            <!-- Фильтр по статусу -->
+            <div class="filter-section">
+                <div class="status-filter" id="statusFilter">
+                    <button class="status-filter-btn active" data-status="all">Все</button>
+                    <button class="status-filter-btn" data-status="первое сообщение">🆕 Первое сообщение</button>
+                    <button class="status-filter-btn" data-status="ожидание менеджера">📞 Ожидание менеджера</button>
+                    <button class="status-filter-btn" data-status="в работе">⚙️ В работе</button>
+                    <button class="status-filter-btn" data-status="закрыт">✅ Закрыт</button>
+                </div>
+            </div>
+            
             <div class="chats-list" id="chatsList">
                 <div class="empty-state">Загрузка...</div>
             </div>
@@ -320,7 +497,7 @@
         <div class="messages-area" id="messagesArea" style="display: none;">
             <div class="messages-header">
                 <div><strong id="chatName" class="selected-chat-name"></strong></div>
-                <div style="display: flex; gap: 12px; align-items: center;">
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                     <select id="statusSelect" class="status-select">
                         <option value="первое сообщение">первое сообщение</option>
                         <option value="ожидание менеджера">ожидание менеджера</option>
@@ -328,7 +505,11 @@
                         <option value="закрыт">закрыт</option>
                     </select>
                     <button id="toggleAutoBtn" class="toggle-auto-btn">Авторежим ВКЛ</button>
+                    <button id="templatesBtn" class="templates-btn">📋 Шаблоны</button>
                     <div class="export-buttons">
+                        <input type="date" id="exportDateFrom" class="date-input" placeholder="с">
+                        <input type="date" id="exportDateTo" class="date-input" placeholder="по">
+                        <button id="exportPeriodBtn" class="export-link">📊 Экспорт</button>
                         <a href="/api/export/csv" class="export-link">📥 CSV</a>
                         <a href="/api/export/pdf" class="export-link">📄 PDF</a>
                     </div>
@@ -341,12 +522,29 @@
             </div>
         </div>
     </div>
+    
+    <!-- Модальное окно шаблонов -->
+    <div class="modal-overlay" id="templatesModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>📋 Шаблоны ответов</span>
+                <span class="modal-close" onclick="closeTemplatesModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="templatesList"></div>
+                <div class="add-template-form">
+                    <input type="text" id="newTemplateTitle" placeholder="Название шаблона">
+                    <textarea id="newTemplateText" rows="3" placeholder="Текст шаблона..."></textarea>
+                    <button class="add-template-btn" onclick="addTemplate()">+ Добавить шаблон</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         // ========== ТЕМА ==========
         function initTheme() {
             const savedTheme = localStorage.getItem('theme');
-            const themeBtn = document.getElementById('themeToggleBtn');
             const themeIcon = document.getElementById('themeIcon');
             const themeText = document.getElementById('themeText');
             
@@ -362,7 +560,6 @@
         }
         
         function toggleTheme() {
-            const themeBtn = document.getElementById('themeToggleBtn');
             const themeIcon = document.getElementById('themeIcon');
             const themeText = document.getElementById('themeText');
             
@@ -382,13 +579,32 @@
         document.getElementById('themeToggleBtn')?.addEventListener('click', toggleTheme);
         initTheme();
         
-        // ========== CRM ЛОГИКА ==========
+        // ========== ПЕРЕМЕННЫЕ ==========
         let currentChatId = null;
         let currentAutoMode = true;
+        let currentStatusFilter = 'all';
         
+        // ========== ФИЛЬТРАЦИЯ ЧАТОВ ==========
+        function initStatusFilter() {
+            const filterBtns = document.querySelectorAll('.status-filter-btn');
+            filterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentStatusFilter = btn.dataset.status;
+                    loadChats();
+                });
+            });
+        }
+        
+        // ========== ЗАГРУЗКА ЧАТОВ ==========
         async function loadChats() {
             try {
-                const res = await fetch('/api/chats');
+                let url = '/api/chats';
+                if (currentStatusFilter !== 'all') {
+                    url += `?status=${encodeURIComponent(currentStatusFilter)}`;
+                }
+                const res = await fetch(url);
                 const data = await res.json();
                 const container = document.getElementById('chatsList');
                 
@@ -415,6 +631,7 @@
             return div.innerHTML;
         }
         
+        // ========== ВЫБОР ЧАТА ==========
         async function selectChat(chatId) {
             currentChatId = chatId;
             
@@ -436,6 +653,7 @@
             await fetch(`/api/chats/${chatId}/mark-read`, { method: 'POST' });
         }
         
+        // ========== ЗАГРУЗКА СООБЩЕНИЙ ==========
         async function loadMessages(chatId) {
             const res = await fetch(`/api/chats/${chatId}/messages`);
             const data = await res.json();
@@ -455,6 +673,7 @@
             container.scrollTop = container.scrollHeight;
         }
         
+        // ========== ОТПРАВКА СООБЩЕНИЯ ==========
         async function sendMessage() {
             const input = document.getElementById('messageInput');
             const text = input.value.trim();
@@ -472,6 +691,7 @@
             }
         }
         
+        // ========== ОБНОВЛЕНИЕ СТАТУСА ==========
         async function updateStatus() {
             const status = document.getElementById('statusSelect').value;
             if (!currentChatId) return;
@@ -481,8 +701,10 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status })
             });
+            loadChats(); // Обновляем список чатов
         }
         
+        // ========== ПЕРЕКЛЮЧЕНИЕ АВТОРЕЖИМА ==========
         async function toggleAutoMode() {
             if (!currentChatId) return;
             
@@ -496,9 +718,95 @@
             }
         }
         
+        // ========== ШАБЛОНЫ ==========
+        let templates = [];
+        
+        async function loadTemplates() {
+            try {
+                const res = await fetch('/api/templates');
+                const data = await res.json();
+                templates = data.templates;
+                renderTemplatesList();
+            } catch(e) {
+                console.error(e);
+            }
+        }
+        
+        function renderTemplatesList() {
+            const container = document.getElementById('templatesList');
+            if (!templates.length) {
+                container.innerHTML = '<div class="empty-state">Нет шаблонов. Создайте первый!</div>';
+                return;
+            }
+            container.innerHTML = templates.map(tpl => `
+                <div class="template-item" onclick="useTemplate(${tpl.id})">
+                    <div class="template-title">${escapeHtml(tpl.title)}</div>
+                    <div class="template-text">${escapeHtml(tpl.text.substring(0, 100))}${tpl.text.length > 100 ? '...' : ''}</div>
+                </div>
+            `).join('');
+        }
+        
+        function useTemplate(templateId) {
+            const template = templates.find(t => t.id === templateId);
+            if (template && currentChatId) {
+                document.getElementById('messageInput').value = template.text;
+                document.getElementById('messageInput').focus();
+                closeTemplatesModal();
+            }
+        }
+        
+        async function addTemplate() {
+            const title = document.getElementById('newTemplateTitle').value.trim();
+            const text = document.getElementById('newTemplateText').value.trim();
+            
+            if (!title || !text) {
+                alert('Заполните название и текст шаблона');
+                return;
+            }
+            
+            const res = await fetch('/api/templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, text })
+            });
+            
+            if (res.ok) {
+                document.getElementById('newTemplateTitle').value = '';
+                document.getElementById('newTemplateText').value = '';
+                await loadTemplates();
+            } else {
+                alert('Ошибка добавления шаблона');
+            }
+        }
+        
+        function openTemplatesModal() {
+            document.getElementById('templatesModal').classList.add('active');
+            loadTemplates();
+        }
+        
+        function closeTemplatesModal() {
+            document.getElementById('templatesModal').classList.remove('active');
+        }
+        
+        // ========== ЭКСПОРТ ПО ПЕРИОДУ ==========
+        async function exportPeriod() {
+            const dateFrom = document.getElementById('exportDateFrom').value;
+            const dateTo = document.getElementById('exportDateTo').value;
+            
+            if (!dateFrom || !dateTo) {
+                alert('Выберите период (с и по дату)');
+                return;
+            }
+            
+            window.open(`/api/export/period?from=${dateFrom}&to=${dateTo}`, '_blank');
+        }
+        
+        // ========== ОБРАБОТЧИКИ ==========
         document.getElementById('statusSelect')?.addEventListener('change', updateStatus);
         document.getElementById('toggleAutoBtn')?.addEventListener('click', toggleAutoMode);
         document.getElementById('sendBtn')?.addEventListener('click', sendMessage);
+        document.getElementById('templatesBtn')?.addEventListener('click', openTemplatesModal);
+        document.getElementById('exportPeriodBtn')?.addEventListener('click', exportPeriod);
         document.getElementById('messageInput')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -506,6 +814,7 @@
             }
         });
         
+        initStatusFilter();
         loadChats();
         setInterval(() => {
             loadChats();
