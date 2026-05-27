@@ -84,9 +84,20 @@
         }
         
         .header-left h1 {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .header-left h1 .bot-name {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: normal;
         }
         
         /* ========== МЕНЮ С ТРЕМЯ ТОЧКАМИ ========== */
@@ -903,7 +914,10 @@
     
     <div class="header">
         <div class="header-left">
-            <h1>🤖 RobotChoiceBot CRM</h1>
+            <h1 id="crmTitle">
+                🤖 RobotChoiceBot CRM
+                <span id="botNameTag" class="bot-name">@RobotChoiceBot</span>
+            </h1>
         </div>
         <div class="menu-container">
             <button class="menu-btn" id="menuBtn">
@@ -1128,6 +1142,22 @@
         let filterPanelVisible = false;
         let sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
         
+        // ========== ФУНКЦИЯ ОБНОВЛЕНИЯ ЗАГОЛОВКА ==========
+        function updateCrmTitle(botName) {
+            const titleElement = document.getElementById('crmTitle');
+            const botNameTag = document.getElementById('botNameTag');
+            
+            // Извлекаем username из полного названия бота
+            let displayName = botName;
+            if (displayName && !displayName.startsWith('@')) {
+                displayName = '@' + displayName;
+            }
+            
+            if (botNameTag) {
+                botNameTag.textContent = displayName || '@RobotChoiceBot';
+            }
+        }
+        
         // ========== ЗАГРУЗКА БОТОВ ==========
         async function loadBots() {
             try {
@@ -1139,6 +1169,12 @@
                     selector.innerHTML = data.bots.map(bot => 
                         `<option value="${bot.id}" ${bot.is_active ? 'selected' : ''}>${bot.name}</option>`
                     ).join('');
+                    
+                    // Устанавливаем имя активного бота в заголовок
+                    const activeBot = data.bots.find(bot => bot.is_active);
+                    if (activeBot) {
+                        updateCrmTitle(activeBot.name);
+                    }
                 } else {
                     selector.innerHTML = '<option value="">Нет ботов</option>';
                 }
@@ -1151,15 +1187,19 @@
             try {
                 const res = await fetch('/api/bots/switch', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type':application/json' },
                     body: JSON.stringify({ bot_id: parseInt(botId) })
                 });
                 
                 if (res.ok) {
+                    const data = await res.json();
+                    // Обновляем заголовок с именем нового бота
+                    updateCrmTitle(data.bot_name);
+                    
                     currentChatId = null;
                     document.getElementById('messagesArea').style.display = 'none';
                     await loadChats();
-                    showToast('✅ Бот переключён');
+                    showToast('✅ Бот переключён на ' + data.bot_name);
                 }
             } catch(e) {
                 console.error('Error switching bot:', e);
