@@ -108,10 +108,17 @@
             border-color: #2a2a4a;
         }
         
+        body.dark .modal-header span {
+            color: #e8e8e8;
+        }
+        
+        body.dark .modal-header .modal-close {
+            color: #e8e8e8;
+        }
+        
         body.dark .template-item {
             background: #1a1a2e;
             border-color: #2a2a4a;
-            color: #e8e8e8;
         }
         
         body.dark .template-title {
@@ -137,6 +144,10 @@
         body.dark .utm-info-block {
             background: #1a1a2e;
             border-color: #2a2a4a;
+        }
+        
+        body.dark .utm-info-block strong {
+            color: #e8e8e8;
         }
         
         body.dark .utm-field .utm-label {
@@ -248,6 +259,10 @@
             color: #00f0ff;
         }
         
+        body.dark .chats-header span {
+            color: #e8e8e8;
+        }
+        
         body.dark #searchChatsInput {
             background: #1a1a2e;
             border-color: #2a2a4a;
@@ -318,6 +333,26 @@
         
         body.dark .message-input-container {
             background: #16213e;
+        }
+        
+        body.dark .selected-chat-name,
+        body.dark #chatName,
+        body.dark #chatNameCompact,
+        body.dark .toolbar-full strong,
+        body.dark .toolbar-compact strong {
+            color: #e8e8e8;
+        }
+        
+        body.dark .add-template-btn {
+            color: #1a1a2e;
+        }
+        
+        body.dark .show-sidebar-btn {
+            color: white;
+        }
+        
+        body.dark h1, body.dark h2, body.dark h3, body.dark h4 {
+            color: #e8e8e8;
         }
         
         /* ========== АКЦЕНТНЫЕ ЦВЕТА ========== */
@@ -401,19 +436,39 @@
         }
         
         .message-sender .sender-name {
-            opacity: 0.85;
+            opacity: 0.9;
         }
         
-        .message.user .message-sender {
-            color: var(--status-new);
+        /* Цвета для меток отправителей (контрастные, не сливаются с фоном) */
+        .message.user .message-sender .sender-name,
+        .message.user .message-sender .sender-icon {
+            color: #3498db;
         }
         
-        .message.bot .message-sender {
-            color: var(--accent);
+        .message.bot .message-sender .sender-name,
+        .message.bot .message-sender .sender-icon {
+            color: #00f0ff;
         }
         
-        .message.operator .message-sender {
-            color: #34c759;
+        .message.operator .message-sender .sender-name,
+        .message.operator .message-sender .sender-icon {
+            color: #ffcc00;
+        }
+        
+        /* Для тёмной темы - оставляем те же цвета */
+        body.dark .message.user .message-sender .sender-name,
+        body.dark .message.user .message-sender .sender-icon {
+            color: #3498db;
+        }
+        
+        body.dark .message.bot .message-sender .sender-name,
+        body.dark .message.bot .message-sender .sender-icon {
+            color: #00f0ff;
+        }
+        
+        body.dark .message.operator .message-sender .sender-name,
+        body.dark .message.operator .message-sender .sender-icon {
+            color: #ffcc00;
         }
         
         .message-text {
@@ -2171,13 +2226,13 @@
             function getSenderInfo(senderType) {
                 switch(senderType) {
                     case 'user':
-                        return { icon: '👤', name: 'Клиент', color: 'var(--status-new)' };
+                        return { icon: '👤', name: 'Клиент' };
                     case 'bot':
-                        return { icon: '🤖', name: 'RobotChoiceBot', color: 'var(--accent)' };
+                        return { icon: '🤖', name: 'RobotChoiceBot' };
                     case 'operator':
-                        return { icon: '👨‍💼', name: 'Оператор', color: '#34c759' };
+                        return { icon: '👨‍💼', name: 'Оператор' };
                     default:
-                        return { icon: '💬', name: 'Сообщение', color: 'var(--text-muted)' };
+                        return { icon: '💬', name: 'Сообщение' };
                 }
             }
             
