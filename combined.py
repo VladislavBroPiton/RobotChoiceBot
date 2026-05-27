@@ -46,55 +46,23 @@ dp = Dispatcher(storage=storage)
 import json
 
 def parse_utm_from_start_param(start_param: str) -> dict:
-    """Парсит UTM-метки из параметра start (поддерживает JSON формат)"""
     if not start_param:
         return {}
     
     utm_data = {}
     
-    # Пробуем распарсить как JSON
-    try:
-        # Декодируем URL-encoded строку если есть
-        import urllib.parse
-        decoded = urllib.parse.unquote(start_param)
-        
-        # Пробуем найти JSON объект
-        if decoded.startswith('{') and decoded.endswith('}'):
-            data = json.loads(decoded)
-            utm_data['start_param'] = data.get('id', data.get('start_param', ''))
-            
-            # Извлекаем UTM-параметры
-            for key in ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']:
-                if key in data:
-                    utm_data[key] = data[key]
-            
-            # Извлекаем дополнительные параметры
-            if 'ref' in data:
-                utm_data['referrer'] = data['ref']
-            if 'gclid' in data:
-                utm_data['gclid'] = data['gclid']
-            
-            return utm_data
-    except:
-        pass
-    
-    # Старый формат (через & или ?) - оставляем для совместимости
-    if '&' in start_param or '?' in start_param:
-        parts = start_param.split('&', 1) if '&' in start_param else start_param.split('?', 1)
-        utm_data['start_param'] = parts[0]
-        
-        if len(parts) > 1:
-            for param in parts[1].split('&'):
-                if '=' in param:
-                    key, value = param.split('=', 1)
-                    if key.startswith('utm_'):
-                        utm_data[key] = value
-                    elif key == 'ref':
-                        utm_data['referrer'] = value
-                    elif key == 'gclid':
-                        utm_data['gclid'] = value
+    # Формат: id__source__medium__campaign
+    if '__' in start_param:
+        parts = start_param.split('__')
+        utm_data['start_param'] = parts[0] if len(parts) > 0 else ''
+        utm_data['utm_source'] = parts[1] if len(parts) > 1 else ''
+        utm_data['utm_medium'] = parts[2] if len(parts) > 2 else ''
+        utm_data['utm_campaign'] = parts[3] if len(parts) > 3 else ''
+        utm_data['utm_term'] = parts[4] if len(parts) > 4 else ''
+        utm_data['utm_content'] = parts[5] if len(parts) > 5 else ''
         return utm_data
     
+    # Обычный текст
     utm_data['start_param'] = start_param
     return utm_data
 
