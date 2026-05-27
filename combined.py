@@ -687,8 +687,19 @@ async def lifespan(app: FastAPI):
     # Устанавливаем вебхук при старте
     if bot:
         webhook_url = f"https://robotchoicebot.onrender.com/webhook"
-        await bot.set_webhook(webhook_url)
-        logger.info(f"✅ Вебхук установлен: {webhook_url}")
+        try:
+            # Сначала удаляем старые вебхуки с очисткой накопленных обновлений
+            await bot.delete_webhook(drop_pending_updates=True)
+            logger.info("✅ Старый вебхук удалён")
+            
+            # Устанавливаем новый вебхук
+            result = await bot.set_webhook(webhook_url)
+            if result:
+                logger.info(f"✅ Вебхук установлен: {webhook_url}")
+            else:
+                logger.error(f"❌ Ошибка установки вебхука")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при установке вебхука: {e}")
     
     yield
     
