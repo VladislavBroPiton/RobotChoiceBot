@@ -130,28 +130,13 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            cursor: pointer;
-            user-select: none;
-            transition: background 0.2s;
-        }
-        
-        .chats-header:hover {
-            background: var(--accent-light);
+            background: var(--bg-sidebar);
         }
         
         .chats-header-title {
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-        
-        .collapse-icon {
-            font-size: 16px;
-            transition: transform 0.3s ease;
-        }
-        
-        .chats-sidebar.collapsed .collapse-icon {
-            transform: rotate(180deg);
         }
         
         /* Кнопка фильтра */
@@ -167,7 +152,6 @@
             align-items: center;
             gap: 6px;
             transition: all 0.2s;
-            position: relative;
         }
         
         .filter-btn:hover {
@@ -181,6 +165,32 @@
             border-color: var(--accent);
         }
         
+        /* Кнопка сворачивания панели */
+        .collapse-btn {
+            background: var(--button-secondary);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .collapse-btn:hover {
+            background: var(--accent-light);
+            border-color: var(--accent);
+        }
+        
+        .collapse-icon {
+            font-size: 14px;
+            transition: transform 0.3s ease;
+        }
+        
+        /* Панель фильтрации (скрыта по умолчанию) */
         .filter-panel {
             display: none;
             padding: 12px 16px;
@@ -277,6 +287,15 @@
         
         .filter-clear:hover {
             background: var(--accent-light);
+        }
+        
+        .filter-badge {
+            background: var(--accent);
+            color: white;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 10px;
+            margin-left: 4px;
         }
         
         .chats-list {
@@ -380,7 +399,6 @@
             display: flex;
         }
         
-        /* Компактные кнопки */
         .compact-btn {
             background: var(--button-secondary);
             border: 1px solid var(--border);
@@ -393,6 +411,7 @@
             align-items: center;
             gap: 4px;
             transition: all 0.2s;
+            text-decoration: none;
         }
         
         .compact-btn:hover {
@@ -545,6 +564,7 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            flex-wrap: wrap;
         }
         
         .export-link {
@@ -675,15 +695,6 @@
             cursor: pointer;
         }
         
-        .filter-badge {
-            background: var(--accent);
-            color: white;
-            border-radius: 10px;
-            padding: 2px 6px;
-            font-size: 10px;
-            margin-left: 4px;
-        }
-        
         .show-sidebar-btn {
             position: fixed;
             left: 0;
@@ -733,8 +744,15 @@
                 <div class="chats-header-title">
                     <span>📋 Чаты</span>
                 </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <span class="collapse-icon" id="collapseIcon">◀</span>
+                <div style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
+                    <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу">
+                        <span>🔍</span>
+                        <span>Фильтр</span>
+                        <span id="filterBadge" class="filter-badge" style="display: none;"></span>
+                    </button>
+                    <button class="collapse-btn" id="collapseBtn" title="Свернуть панель">
+                        <span class="collapse-icon" id="collapseIcon">◀</span>
+                    </button>
                 </div>
             </div>
             
@@ -759,7 +777,6 @@
         
         <div class="messages-area" id="messagesArea" style="display: none;">
             <div class="messages-header" id="messagesHeader">
-                <!-- Полная панель инструментов -->
                 <div class="toolbar-full" id="toolbarFull">
                     <div><strong id="chatName" class="selected-chat-name"></strong></div>
                     <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
@@ -780,7 +797,6 @@
                         </div>
                     </div>
                 </div>
-                <!-- Компактная панель инструментов (показывается, когда сайдбар свёрнут) -->
                 <div class="toolbar-compact" id="toolbarCompact">
                     <div><strong id="chatNameCompact" class="selected-chat-name"></strong></div>
                     <div class="compact-status" id="compactStatus">Статус</div>
@@ -890,7 +906,7 @@
             }
         }
         
-        document.getElementById('chatsHeader')?.addEventListener('click', toggleSidebar);
+        document.getElementById('collapseBtn')?.addEventListener('click', toggleSidebar);
         document.getElementById('showSidebarBtn')?.addEventListener('click', showSidebar);
         
         // Инициализация состояния панели при загрузке
@@ -959,6 +975,9 @@
                 toggleFilterPanel();
             }
         }
+        
+        document.getElementById('filterToggleBtn')?.addEventListener('click', toggleFilterPanel);
+        document.getElementById('clearFilterBtn')?.addEventListener('click', clearFilters);
         
         // ========== ФИЛЬТРАЦИЯ ЧАТОВ ==========
         function initStatusFilter() {
@@ -1217,15 +1236,14 @@
         async function exportPeriod() {
             const dateFrom = document.getElementById('exportDateFrom').value;
             const dateTo = document.getElementById('exportDateTo').value;
-    
+            
             if (!dateFrom || !dateTo) {
                 alert('Выберите период (с и по дату)');
                 return;
+            }
+            
+            window.open(`/api/export/period?from_date=${dateFrom}&to_date=${dateTo}`, '_blank');
         }
-    
-    // Исправлено: from_date и to_date (как ожидает бэкенд)
-    window.open(`/api/export/period?from_date=${dateFrom}&to_date=${dateTo}`, '_blank');
-}
         
         // ========== КОМПАКТНЫЕ КНОПКИ ==========
         document.getElementById('compactAutoBtn')?.addEventListener('click', () => {
@@ -1239,7 +1257,6 @@
                 alert('Выберите период (с и по дату)');
                 return;
             }
-            // Исправлено: from_date и to_date
             window.open(`/api/export/period?from_date=${dateFrom}&to_date=${dateTo}`, '_blank');
         });
         
