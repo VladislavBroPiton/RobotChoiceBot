@@ -1719,86 +1719,93 @@
         }
         
         // ========== ИСТОРИЯ UTM-МЕТОК ==========
-        async function showUtmHistory() {
-            if (!currentChatId) {
-                showToast('❌ Сначала выберите чат');
-                return;
-            }
-            
-            try {
-                const chatRes = await fetch(`/api/chats/${currentChatId}/full`);
-                const chat = await chatRes.json();
-                const userId = chat.user_id;
-                
-                if (!userId) {
-                    showToast('❌ Не удалось определить пользователя');
-                    return;
-                }
-                
-                const sessionsRes = await fetch(`/api/users/${userId}/sessions`);
-                const sessionsData = await sessionsRes.json();
-                
-                const modalBody = document.getElementById('utmHistoryBody');
-                
-                if (!sessionsData.sessions || sessionsData.sessions.length === 0) {
-                    modalBody.innerHTML = '<div class="utm-empty">📭 Нет истории UTM-меток</div>';
-                    document.getElementById('utmHistoryModal').classList.add('active');
-                    return;
-                }
-                
-                let tableHtml = `
-                    <table class="utm-history-table">
-                        <thead>
-                            <tr>
-                                <th>📅 Дата и время</th>
-                                <th>📡 Источник</th>
-                                <th>📊 Тип</th>
-                                <th>🎯 Кампания</th>
-                                <th>🔑 Ключевое слово</th>
-                                <th>📝 Контент</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                
-                for (const session of sessionsData.sessions) {
-                    const date = new Date(session.first_interaction);
-                    const formattedDate = date.toLocaleString('ru-RU', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                    
-                    tableHtml += `
-                        <tr>
-                            <td class="utm-history-date">${formattedDate}</td>
-                            <td class="utm-history-value">${escapeHtml(session.utm_source || '-')}</td>
-                            <td class="utm-history-value">${escapeHtml(session.utm_medium || '-')}</td>
-                            <td class="utm-history-value">${escapeHtml(session.utm_campaign || '-')}</td>
-                            <td class="utm-history-value">${escapeHtml(session.utm_term || '-')}</td>
-                            <td class="utm-history-value">${escapeHtml(session.utm_content || '-')}</td>
-                        </table>
-                    `;
-                }
-                
-                tableHtml += `
-                        </tbody>
-                    </table>
-                    <div style="margin-top: 12px; padding: 8px; background: var(--accent-light); border-radius: 8px; font-size: 10px; color: var(--text-secondary);">
-                        📊 Всего визитов с UTM: ${sessionsData.sessions.length}
-                    </div>
-                `;
-                
-                modalBody.innerHTML = tableHtml;
-                document.getElementById('utmHistoryModal').classList.add('active');
-                
-            } catch(e) {
-                console.error('Error loading UTM history:', e);
-                showToast('❌ Ошибка загрузки истории UTM');
-            }
+async function showUtmHistory() {
+    if (!currentChatId) {
+        showToast('❌ Сначала выберите чат');
+        return;
+    }
+    
+    try {
+        const chatRes = await fetch(`/api/chats/${currentChatId}/full`);
+        const chat = await chatRes.json();
+        const userId = chat.user_id;
+        
+        if (!userId) {
+            showToast('❌ Не удалось определить пользователя');
+            return;
         }
+        
+        const sessionsRes = await fetch(`/api/users/${userId}/sessions`);
+        const sessionsData = await sessionsRes.json();
+        
+        const modalBody = document.getElementById('utmHistoryBody');
+        
+        if (!sessionsData.sessions || sessionsData.sessions.length === 0) {
+            modalBody.innerHTML = '<div class="utm-empty">📭 Нет истории UTM-меток</div>';
+            document.getElementById('utmHistoryModal').classList.add('active');
+            return;
+        }
+        
+        let tableHtml = `
+            <table class="utm-history-table">
+                <thead>
+                    <tr>
+                        <th>📅 Дата и время</th>
+                        <th>📡 Источник</th>
+                        <th>📊 Тип</th>
+                        <th>🎯 Кампания</th>
+                        <th>🔑 Ключевое слово</th>
+                        <th>📝 Контент</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        for (const session of sessionsData.sessions) {
+            const date = new Date(session.first_interaction);
+            const formattedDate = date.toLocaleString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            // Экранируем значения и заменяем пустые строки на "-"
+            const source = session.utm_source && session.utm_source.trim() !== '' ? escapeHtml(session.utm_source) : '-';
+            const medium = session.utm_medium && session.utm_medium.trim() !== '' ? escapeHtml(session.utm_medium) : '-';
+            const campaign = session.utm_campaign && session.utm_campaign.trim() !== '' ? escapeHtml(session.utm_campaign) : '-';
+            const term = session.utm_term && session.utm_term.trim() !== '' ? escapeHtml(session.utm_term) : '-';
+            const content = session.utm_content && session.utm_content.trim() !== '' ? escapeHtml(session.utm_content) : '-';
+            
+            tableHtml += `
+                <tr>
+                    <td class="utm-history-date">${formattedDate}</td>
+                    <td class="utm-history-value">${source}</td>
+                    <td class="utm-history-value">${medium}</td>
+                    <td class="utm-history-value">${campaign}</td>
+                    <td class="utm-history-value">${term}</td>
+                    <td class="utm-history-value">${content}</td>
+                </tr>
+            `;
+        }
+        
+        tableHtml += `
+                </tbody>
+            </table>
+            <div style="margin-top: 12px; padding: 8px; background: var(--accent-light); border-radius: 8px; font-size: 10px; color: var(--text-secondary);">
+                📊 Всего визитов с UTM: ${sessionsData.sessions.length}
+            </div>
+        `;
+        
+        modalBody.innerHTML = tableHtml;
+        document.getElementById('utmHistoryModal').classList.add('active');
+        
+    } catch(e) {
+        console.error('Error loading UTM history:', e);
+        showToast('❌ Ошибка загрузки истории UTM');
+    }
+}
         
         function closeUtmHistoryModal() {
             document.getElementById('utmHistoryModal').classList.remove('active');
