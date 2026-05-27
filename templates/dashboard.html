@@ -7,6 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
+        /* ========== СВЕТЛАЯ ТЕМА (по умолчанию) ========== */
         :root {
             --bg-primary: #f0f2f5;
             --bg-secondary: #ffffff;
@@ -33,6 +34,7 @@
             --status-closed: #95a5a6;
         }
         
+        /* ========== ТЁМНАЯ ТЕМА ========== */
         body.dark {
             --bg-primary: #1a1a2e;
             --bg-secondary: #16213e;
@@ -157,6 +159,7 @@
             font-size: 13px;
             font-weight: 500;
             transition: all 0.2s;
+            position: relative;
         }
         
         .tab-btn:hover {
@@ -168,6 +171,43 @@
             background: var(--accent);
             color: white;
             border-color: var(--accent);
+        }
+        
+        /* Tooltip для кнопок */
+        [data-tooltip] {
+            position: relative;
+        }
+        
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 8px;
+            padding: 6px 12px;
+            background: var(--tooltip-bg);
+            color: var(--tooltip-text);
+            font-size: 11px;
+            font-weight: normal;
+            white-space: nowrap;
+            border-radius: 6px;
+            z-index: 1000;
+            pointer-events: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        [data-tooltip]:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 2px;
+            border: 5px solid transparent;
+            border-top-color: var(--tooltip-bg);
+            z-index: 1000;
+            pointer-events: none;
         }
         
         .tab-content {
@@ -227,6 +267,7 @@
             align-items: center;
             gap: 6px;
             transition: all 0.2s;
+            position: relative;
         }
         
         .filter-btn:hover {
@@ -248,6 +289,7 @@
             cursor: pointer;
             font-size: 14px;
             transition: all 0.2s;
+            position: relative;
         }
         
         .collapse-btn:hover {
@@ -266,6 +308,19 @@
         
         .filter-panel.show {
             display: flex;
+        }
+        
+        .filter-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filter-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
         }
         
         .status-filter {
@@ -296,29 +351,16 @@
             border-color: var(--accent);
         }
         
-        .status-filter-btn:hover::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            margin-bottom: 8px;
-            padding: 6px 12px;
-            background: var(--tooltip-bg);
-            color: var(--tooltip-text);
-            font-size: 11px;
-            white-space: nowrap;
-            border-radius: 6px;
-            z-index: 100;
-            pointer-events: none;
-        }
-        
         .filter-clear {
             font-size: 11px;
             color: var(--accent);
             cursor: pointer;
             padding: 4px 8px;
             border-radius: 4px;
+        }
+        
+        .filter-clear:hover {
+            background: var(--accent-light);
         }
         
         .filter-badge {
@@ -427,6 +469,7 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
+            position: relative;
         }
         
         .compact-btn:hover {
@@ -522,6 +565,7 @@
             cursor: pointer;
             font-size: 20px;
             transition: background 0.2s;
+            position: relative;
         }
         
         .status-select {
@@ -540,6 +584,7 @@
             border-radius: 6px;
             cursor: pointer;
             transition: background 0.2s;
+            position: relative;
         }
         
         .toggle-auto-btn.off {
@@ -554,6 +599,7 @@
             border-radius: 6px;
             cursor: pointer;
             font-size: 13px;
+            position: relative;
         }
         
         .templates-btn:hover {
@@ -586,6 +632,12 @@
             text-decoration: none;
             font-size: 14px;
             transition: all 0.2s;
+            position: relative;
+        }
+        
+        .export-link:hover {
+            background: var(--accent-light);
+            border-color: var(--accent);
         }
         
         .date-input {
@@ -823,28 +875,28 @@
                 <div class="chats-header" id="chatsHeader">
                     <span>📋 Чаты</span>
                     <div style="display: flex; gap: 8px;">
-                        <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу">
+                        <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу" data-tooltip="Фильтровать чаты по статусу диалога">
                             <span>🔍</span>
                             <span>Фильтр</span>
                             <span id="filterBadge" class="filter-badge" style="display: none;"></span>
                         </button>
-                        <button class="collapse-btn" id="collapseBtn" title="Свернуть панель">
+                        <button class="collapse-btn" id="collapseBtn" title="Свернуть панель" data-tooltip="Скрыть панель чатов для экономии места">
                             <span class="collapse-icon" id="collapseIcon">◀</span>
                         </button>
                     </div>
                 </div>
                 
                 <div class="filter-panel" id="filterPanel">
-                    <div class="filter-row" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <div class="filter-row">
                         <span class="filter-label">📌 Статус:</span>
                         <div class="status-filter" id="statusFilter">
-                            <button class="status-filter-btn active" data-status="all" data-tooltip="Показать все чаты">Все</button>
-                            <button class="status-filter-btn" data-status="первое сообщение" data-tooltip="Первое сообщение">🆕 Первое</button>
-                            <button class="status-filter-btn" data-status="ожидание менеджера" data-tooltip="Ожидает менеджера">📞 Ожидание</button>
-                            <button class="status-filter-btn" data-status="в работе" data-tooltip="В работе">⚙️ В работе</button>
-                            <button class="status-filter-btn" data-status="закрыт" data-tooltip="Закрыт">✅ Закрыт</button>
+                            <button class="status-filter-btn active" data-status="all" data-tooltip="Показать все чаты без фильтрации">Все</button>
+                            <button class="status-filter-btn" data-status="первое сообщение" data-tooltip="Клиент только написал первое сообщение">🆕 Первое</button>
+                            <button class="status-filter-btn" data-status="ожидание менеджера" data-tooltip="Клиент ожидает ответа от менеджера">📞 Ожидание</button>
+                            <button class="status-filter-btn" data-status="в работе" data-tooltip="Менеджер взял чат в работу">⚙️ В работе</button>
+                            <button class="status-filter-btn" data-status="закрыт" data-tooltip="Диалог завершён">✅ Закрыт</button>
                         </div>
-                        <span class="filter-clear" id="clearFilterBtn">✕ сбросить</span>
+                        <span class="filter-clear" id="clearFilterBtn" data-tooltip="Сбросить все фильтры">✕ сбросить</span>
                     </div>
                 </div>
                 
@@ -858,37 +910,37 @@
                     <div class="toolbar-full" id="toolbarFull">
                         <div><strong id="chatName" class="selected-chat-name"></strong></div>
                         <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                            <select id="statusSelect" class="status-select">
+                            <select id="statusSelect" class="status-select" data-tooltip="Изменить статус диалога">
                                 <option value="первое сообщение">первое сообщение</option>
                                 <option value="ожидание менеджера">ожидание менеджера</option>
                                 <option value="в работе">в работе</option>
                                 <option value="закрыт">закрыт</option>
                             </select>
-                            <button id="toggleAutoBtn" class="toggle-auto-btn">Авторежим ВКЛ</button>
-                            <button id="templatesBtn" class="templates-btn">📋 Шаблоны</button>
+                            <button id="toggleAutoBtn" class="toggle-auto-btn" data-tooltip="Включить/выключить автоответы бота">Авторежим ВКЛ</button>
+                            <button id="templatesBtn" class="templates-btn" data-tooltip="Использовать готовые шаблоны ответов">📋 Шаблоны</button>
                             <div class="export-buttons">
-                                <input type="date" id="exportDateFrom" class="date-input" placeholder="с">
-                                <input type="date" id="exportDateTo" class="date-input" placeholder="по">
-                                <button id="exportPeriodBtn" class="export-link">📊 Экспорт</button>
-                                <a href="/api/export/csv" class="export-link">📥 CSV</a>
-                                <a href="/api/export/pdf" class="export-link">📄 PDF</a>
+                                <input type="date" id="exportDateFrom" class="date-input" data-tooltip="Начало периода для экспорта">
+                                <input type="date" id="exportDateTo" class="date-input" data-tooltip="Конец периода для экспорта">
+                                <button id="exportPeriodBtn" class="export-link" data-tooltip="Экспортировать чаты за выбранный период">📊 Экспорт</button>
+                                <a href="/api/export/csv" class="export-link" data-tooltip="Экспорт всех чатов в CSV">📥 CSV</a>
+                                <a href="/api/export/pdf" class="export-link" data-tooltip="Экспорт всех чатов в PDF">📄 PDF</a>
                             </div>
                         </div>
                     </div>
                     <div class="toolbar-compact" id="toolbarCompact">
                         <div><strong id="chatNameCompact" class="selected-chat-name"></strong></div>
                         <div class="compact-status" id="compactStatus">Статус</div>
-                        <button class="compact-btn" id="compactAutoBtn" title="Авторежим">🤖</button>
-                        <button class="compact-btn" id="compactTemplatesBtn" title="Шаблоны">📋</button>
-                        <button class="compact-btn" id="compactExportBtn" title="Экспорт за период">📊</button>
-                        <a href="/api/export/csv" class="compact-btn" title="CSV">📥</a>
-                        <a href="/api/export/pdf" class="compact-btn" title="PDF">📄</a>
+                        <button class="compact-btn" id="compactAutoBtn" data-tooltip="Включить/выключить автоответы бота">🤖</button>
+                        <button class="compact-btn" id="compactTemplatesBtn" data-tooltip="Использовать готовые шаблоны ответов">📋</button>
+                        <button class="compact-btn" id="compactExportBtn" data-tooltip="Экспортировать чаты за выбранный период">📊</button>
+                        <a href="/api/export/csv" class="compact-btn" data-tooltip="Экспорт всех чатов в CSV">📥</a>
+                        <a href="/api/export/pdf" class="compact-btn" data-tooltip="Экспорт всех чатов в PDF">📄</a>
                     </div>
                 </div>
                 <div class="messages-container" id="messagesContainer"></div>
                 <div class="message-input-container">
                     <textarea class="message-input" id="messageInput" placeholder="Написать сообщение..." rows="1"></textarea>
-                    <button class="send-button" id="sendBtn">➤</button>
+                    <button class="send-button" id="sendBtn" data-tooltip="Отправить сообщение (Enter)">➤</button>
                 </div>
             </div>
         </div>
