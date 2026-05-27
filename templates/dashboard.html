@@ -28,7 +28,6 @@
             --button-secondary: #f8f9fa;
             --tooltip-bg: #333;
             --tooltip-text: #fff;
-            /* Цвета статусов */
             --status-new: #3498db;
             --status-waiting: #f39c12;
             --status-working: #2ecc71;
@@ -103,16 +102,27 @@
             height: calc(100vh - 65px);
         }
         
+        /* Панель чатов (сайдбар) с анимацией */
         .chats-sidebar {
             width: 350px;
+            min-width: 350px;
             background: var(--bg-sidebar);
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            transition: background 0.3s;
+            transition: width 0.3s ease, min-width 0.3s ease, opacity 0.3s ease;
         }
         
+        .chats-sidebar.collapsed {
+            width: 0;
+            min-width: 0;
+            border-right: none;
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        /* Кнопка-заголовок "Панель управления чатами" */
         .chats-header {
             padding: 16px;
             border-bottom: 1px solid var(--border);
@@ -121,6 +131,28 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        
+        .chats-header:hover {
+            background: var(--accent-light);
+        }
+        
+        .chats-header-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .collapse-icon {
+            font-size: 16px;
+            transition: transform 0.3s ease;
+        }
+        
+        .chats-sidebar.collapsed .collapse-icon {
+            transform: rotate(180deg);
         }
         
         /* Кнопка фильтра */
@@ -276,7 +308,6 @@
             margin-bottom: 4px;
         }
         
-        /* Цветные бейджи статусов */
         .status-badge {
             display: inline-block;
             padding: 2px 8px;
@@ -491,7 +522,6 @@
             font-size: 13px;
         }
         
-        /* Модальное окно шаблонов */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -603,9 +633,41 @@
             font-size: 10px;
             margin-left: 4px;
         }
+        
+        /* Кнопка для открытия панели, когда она скрыта */
+        .show-sidebar-btn {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 0 8px 8px 0;
+            padding: 12px 8px;
+            cursor: pointer;
+            z-index: 100;
+            font-size: 20px;
+            transition: all 0.3s;
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .show-sidebar-btn.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        .show-sidebar-btn:hover {
+            background: var(--accent-hover);
+            padding-right: 12px;
+        }
     </style>
 </head>
 <body>
+    <!-- Кнопка для открытия панели, когда она скрыта -->
+    <button class="show-sidebar-btn" id="showSidebarBtn" title="Показать панель чатов">▶</button>
+    
     <div class="header">
         <h1>🤖 RobotChoiceBot CRM</h1>
         <div style="display: flex; gap: 16px; align-items: center;">
@@ -618,14 +680,14 @@
     </div>
     
     <div class="main-content">
-        <div class="chats-sidebar">
-            <div class="chats-header">
-                <span>📋 Чаты</span>
-                <button class="filter-btn" id="filterToggleBtn">
-                    <span>🔍</span>
-                    <span>Фильтр</span>
-                    <span id="filterBadge" class="filter-badge" style="display: none;"></span>
-                </button>
+        <div class="chats-sidebar" id="chatsSidebar">
+            <div class="chats-header" id="chatsHeader">
+                <div class="chats-header-title">
+                    <span>📋 Чаты</span>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span class="collapse-icon" id="collapseIcon">◀</span>
+                </div>
             </div>
             
             <div class="filter-panel" id="filterPanel">
@@ -736,6 +798,53 @@
         let currentAutoMode = true;
         let currentStatusFilter = 'all';
         let filterPanelVisible = false;
+        let sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+        
+        // ========== СВОРАЧИВАНИЕ ПАНЕЛИ ЧАТОВ ==========
+        function toggleSidebar() {
+            const sidebar = document.getElementById('chatsSidebar');
+            const showBtn = document.getElementById('showSidebarBtn');
+            const collapseIcon = document.getElementById('collapseIcon');
+            
+            sidebarCollapsed = !sidebarCollapsed;
+            localStorage.setItem('sidebarCollapsed', sidebarCollapsed);
+            
+            if (sidebarCollapsed) {
+                sidebar.classList.add('collapsed');
+                showBtn.classList.add('visible');
+                if (collapseIcon) collapseIcon.innerHTML = '▶';
+            } else {
+                sidebar.classList.remove('collapsed');
+                showBtn.classList.remove('visible');
+                if (collapseIcon) collapseIcon.innerHTML = '◀';
+            }
+        }
+        
+        function showSidebar() {
+            if (sidebarCollapsed) {
+                toggleSidebar();
+            }
+        }
+        
+        document.getElementById('chatsHeader')?.addEventListener('click', toggleSidebar);
+        document.getElementById('showSidebarBtn')?.addEventListener('click', showSidebar);
+        
+        // Инициализация состояния панели при загрузке
+        function initSidebarState() {
+            const sidebar = document.getElementById('chatsSidebar');
+            const showBtn = document.getElementById('showSidebarBtn');
+            const collapseIcon = document.getElementById('collapseIcon');
+            
+            if (sidebarCollapsed) {
+                sidebar?.classList.add('collapsed');
+                showBtn?.classList.add('visible');
+                if (collapseIcon) collapseIcon.innerHTML = '▶';
+            } else {
+                sidebar?.classList.remove('collapsed');
+                showBtn?.classList.remove('visible');
+                if (collapseIcon) collapseIcon.innerHTML = '◀';
+            }
+        }
         
         // ========== ПАНЕЛЬ ФИЛЬТРАЦИИ ==========
         function toggleFilterPanel() {
@@ -744,11 +853,11 @@
             const btn = document.getElementById('filterToggleBtn');
             
             if (filterPanelVisible) {
-                panel.classList.add('show');
-                btn.classList.add('active');
+                panel?.classList.add('show');
+                btn?.classList.add('active');
             } else {
-                panel.classList.remove('show');
-                btn.classList.remove('active');
+                panel?.classList.remove('show');
+                btn?.classList.remove('active');
             }
         }
         
@@ -801,10 +910,7 @@
             });
         }
         
-        document.getElementById('filterToggleBtn')?.addEventListener('click', toggleFilterPanel);
-        document.getElementById('clearFilterBtn')?.addEventListener('click', clearFilters);
-        
-        // ========== ЗАГРУЗКА ЧАТОВ (с цветными статусами) ==========
+        // ========== ЗАГРУЗКА ЧАТОВ ==========
         function getStatusBadgeClass(status) {
             const statusMap = {
                 'первое сообщение': 'new',
@@ -1047,6 +1153,7 @@
         });
         
         initStatusFilter();
+        initSidebarState();
         loadChats();
         setInterval(() => {
             loadChats();
