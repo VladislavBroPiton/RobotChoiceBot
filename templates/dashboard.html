@@ -158,6 +158,20 @@
             color: #00f0ff;
         }
         
+        /* Исправление для start_param, referrer, gclid в тёмной теме */
+        body.dark .utm-info-block .extra-info {
+            color: #e8e8e8;
+        }
+        
+        body.dark .utm-info-block .extra-info span:first-child {
+            color: #b0b0c0;
+        }
+        
+        body.dark .utm-info-block .extra-info span:last-child {
+            color: #00f0ff;
+            word-break: break-all;
+        }
+        
         body.dark .stats-card {
             background: #16213e;
             border-color: #2a2a4a;
@@ -2105,11 +2119,12 @@
                     extraDiv.style.display = 'flex';
                     extraDiv.style.flexDirection = 'column';
                     extraDiv.style.gap = '4px';
+                    extraDiv.className = 'extra-info';
                     
                     let extraHtml = '';
-                    if (chat.referrer) extraHtml += `<div><span style="color: var(--text-muted);">🔄 Referrer:</span> ${escapeHtml(chat.referrer)}</div>`;
-                    if (chat.gclid) extraHtml += `<div><span style="color: var(--text-muted);">🔗 GCLID:</span> ${escapeHtml(chat.gclid.substring(0, 30))}...</div>`;
-                    if (chat.start_param) extraHtml += `<div><span style="color: var(--text-muted);">🚀 Start param:</span> ${escapeHtml(chat.start_param)}</div>`;
+                    if (chat.referrer) extraHtml += `<div><span>🔄 Referrer:</span> <span>${escapeHtml(chat.referrer)}</span></div>`;
+                    if (chat.gclid) extraHtml += `<div><span>🔗 GCLID:</span> <span>${escapeHtml(chat.gclid.substring(0, 30))}...</span></div>`;
+                    if (chat.start_param) extraHtml += `<div><span>🚀 Start param:</span> <span>${escapeHtml(chat.start_param)}</span></div>`;
                     
                     extraDiv.innerHTML = extraHtml;
                     utmContent.appendChild(extraDiv);
