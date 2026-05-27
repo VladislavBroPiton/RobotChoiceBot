@@ -84,7 +84,7 @@ class Database:
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS bot_instances (
                     id SERIAL PRIMARY KEY,
-                    name TEXT NOT NULL,
+                    name TEXT NOT NULL UNIQUE,
                     bot_token TEXT NOT NULL,
                     is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT NOW()
@@ -94,8 +94,8 @@ class Database:
             # Добавляем ботов по умолчанию, если их нет
             await conn.execute('''
                 INSERT INTO bot_instances (name, bot_token) 
-                VALUES ('RobotChoiceBot', $1)
-                ON CONFLICT (name) DO NOTHING
+                SELECT 'RobotChoiceBot', $1
+                WHERE NOT EXISTS (SELECT 1 FROM bot_instances WHERE name = 'RobotChoiceBot')
             ''', DEFAULT_BOT_TOKEN)
             
             # Таблица пользователей
