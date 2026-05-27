@@ -1144,7 +1144,6 @@
         
         // ========== ФУНКЦИЯ ОБНОВЛЕНИЯ ЗАГОЛОВКА ==========
         function updateCrmTitle(botName) {
-            const titleElement = document.getElementById('crmTitle');
             const botNameTag = document.getElementById('botNameTag');
             
             // Извлекаем username из полного названия бота
@@ -1187,7 +1186,7 @@
             try {
                 const res = await fetch('/api/bots/switch', {
                     method: 'POST',
-                    headers: { 'Content-Type':application/json' },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ bot_id: parseInt(botId) })
                 });
                 
