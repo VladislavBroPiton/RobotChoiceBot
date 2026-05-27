@@ -36,7 +36,7 @@
             --menu-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         
-        /* ========== ТЁМНАЯ ТЕМА (исправлена) ========== */
+        /* ========== ТЁМНАЯ ТЕМА ========== */
         body.dark {
             --bg-primary: #1a1a2e;
             --bg-secondary: #16213e;
@@ -353,9 +353,9 @@
             position: relative;
         }
         
-        /* ========== УЛУЧШЕННЫЕ СООБЩЕНИЯ ========== */
+        /* ========== УЛУЧШЕННЫЕ СООБЩЕНИЯ С МЕТКАМИ ========== */
         .message {
-            max-width: 65%;
+            max-width: 70%;
             padding: 10px 14px;
             border-radius: 16px;
             word-wrap: break-word;
@@ -387,13 +387,38 @@
             border-radius: 16px 16px 4px 16px;
         }
         
-        .message .read-status {
-            font-size: 9px;
-            margin-left: 6px;
-            opacity: 0.6;
-            display: inline-flex;
+        .message-sender {
+            font-size: 10px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: flex;
             align-items: center;
-            gap: 2px;
+            gap: 6px;
+        }
+        
+        .message-sender .sender-icon {
+            font-size: 12px;
+        }
+        
+        .message-sender .sender-name {
+            opacity: 0.85;
+        }
+        
+        .message.user .message-sender {
+            color: var(--status-new);
+        }
+        
+        .message.bot .message-sender {
+            color: var(--accent);
+        }
+        
+        .message.operator .message-sender {
+            color: #34c759;
+        }
+        
+        .message-text {
+            word-break: break-word;
+            line-height: 1.4;
         }
         
         .message-time {
@@ -406,6 +431,17 @@
             gap: 4px;
         }
         
+        .read-status {
+            font-size: 9px;
+            margin-left: 6px;
+            opacity: 0.6;
+        }
+        
+        .read-status.read::before {
+            content: "✓✓";
+            color: #34c759;
+        }
+        
         /* ========== ПОДСВЕТКА ПОИСКА ========== */
         mark {
             background: var(--accent);
@@ -413,17 +449,6 @@
             padding: 0 2px;
             border-radius: 3px;
             font-weight: 500;
-        }
-        
-        @keyframes fadeSlideUp {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
         
         .header {
@@ -2132,7 +2157,7 @@
             document.getElementById('utmHistoryModal').classList.remove('active');
         }
         
-        // ========== ЗАГРУЗКА СООБЩЕНИЙ ==========
+        // ========== ЗАГРУЗКА СООБЩЕНИЙ С МЕТКАМИ ОТПРАВИТЕЛЯ ==========
         async function loadMessages(chatId) {
             const res = await fetch(`/api/chats/${chatId}/messages`);
             const data = await res.json();
@@ -2143,15 +2168,39 @@
                 return;
             }
             
-            container.innerHTML = data.messages.map(msg => `
-                <div class="message ${msg.sender_type}">
-                    ${escapeHtml(msg.message_text || '[Сообщение]')}
-                    <div class="message-time">
-                        ${new Date(msg.timestamp).toLocaleTimeString()}
-                        ${msg.sender_type === 'operator' ? '<span class="read-status read">✓✓</span>' : ''}
+            function getSenderInfo(senderType) {
+                switch(senderType) {
+                    case 'user':
+                        return { icon: '👤', name: 'Клиент', color: 'var(--status-new)' };
+                    case 'bot':
+                        return { icon: '🤖', name: 'RobotChoiceBot', color: 'var(--accent)' };
+                    case 'operator':
+                        return { icon: '👨‍💼', name: 'Оператор', color: '#34c759' };
+                    default:
+                        return { icon: '💬', name: 'Сообщение', color: 'var(--text-muted)' };
+                }
+            }
+            
+            container.innerHTML = data.messages.map(msg => {
+                const sender = getSenderInfo(msg.sender_type);
+                const time = new Date(msg.timestamp).toLocaleTimeString();
+                
+                return `
+                    <div class="message ${msg.sender_type}">
+                        <div class="message-sender">
+                            <span class="sender-icon">${sender.icon}</span>
+                            <span class="sender-name">${escapeHtml(sender.name)}</span>
+                        </div>
+                        <div class="message-text">
+                            ${escapeHtml(msg.message_text || '[Сообщение]')}
+                        </div>
+                        <div class="message-time">
+                            ${time}
+                            ${msg.sender_type === 'operator' ? '<span class="read-status read">✓✓</span>' : ''}
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
             container.scrollTop = container.scrollHeight;
         }
         
