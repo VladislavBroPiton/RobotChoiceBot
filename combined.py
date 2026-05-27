@@ -80,17 +80,19 @@ class Database:
                     username TEXT,
                     full_name TEXT,
                     first_seen TIMESTAMP DEFAULT NOW(),
-                    last_active TIMESTAMP DEFAULT NOW(),
-                    utm_source TEXT,
-                    utm_medium TEXT,
-                    utm_campaign TEXT,
-                    utm_content TEXT,
-                    utm_term TEXT,
-                    referrer TEXT,
-                    start_param TEXT,
-                    gclid TEXT
+                    last_active TIMESTAMP DEFAULT NOW()
                 )
             ''')
+            
+            # Добавляем UTM-колонки (если их нет)
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_source TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_medium TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_campaign TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_content TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_term TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS referrer TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS start_param TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS gclid TEXT')
             
             # Таблица чатов (диалогов)
             await conn.execute('''
@@ -136,7 +138,7 @@ class Database:
                 )
             ''')
             
-            # Таблица статистики (для отчётов)
+            # Таблица статистики
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS crm_stats (
                     id SERIAL PRIMARY KEY,
@@ -148,7 +150,7 @@ class Database:
                 )
             ''')
             
-            # Создаём индексы для быстрого поиска по UTM
+            # Создаём индексы ТОЛЬКО ПОСЛЕ того, как колонки существуют
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_source ON users(utm_source)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_campaign ON users(utm_campaign)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON user_sessions(user_id)')
