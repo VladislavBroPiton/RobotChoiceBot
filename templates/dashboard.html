@@ -28,6 +28,11 @@
             --button-secondary: #f8f9fa;
             --tooltip-bg: #333;
             --tooltip-text: #fff;
+            /* Цвета статусов */
+            --status-new: #3498db;
+            --status-waiting: #f39c12;
+            --status-working: #2ecc71;
+            --status-closed: #95a5a6;
         }
         
         /* ========== ТЁМНАЯ ТЕМА ========== */
@@ -51,6 +56,10 @@
             --button-secondary: #2a2a4a;
             --tooltip-bg: #555;
             --tooltip-text: #fff;
+            --status-new: #3498db;
+            --status-waiting: #f39c12;
+            --status-working: #2ecc71;
+            --status-closed: #7f8c8d;
         }
         
         body {
@@ -175,7 +184,6 @@
             flex: 1;
         }
         
-        /* Стили для кнопок фильтров с подсказками */
         .status-filter-btn {
             position: relative;
             padding: 4px 10px;
@@ -198,7 +206,6 @@
             border-color: var(--accent);
         }
         
-        /* Подсказка (tooltip) */
         .status-filter-btn:hover::after {
             content: attr(data-tooltip);
             position: absolute;
@@ -213,12 +220,10 @@
             font-weight: normal;
             white-space: nowrap;
             border-radius: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             z-index: 100;
             pointer-events: none;
         }
         
-        /* Маленькая стрелочка у подсказки */
         .status-filter-btn:hover::before {
             content: '';
             position: absolute;
@@ -269,6 +274,36 @@
             font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 4px;
+        }
+        
+        /* Цветные бейджи статусов */
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        
+        .status-badge.new {
+            background: var(--status-new);
+            color: white;
+        }
+        
+        .status-badge.waiting {
+            background: var(--status-waiting);
+            color: white;
+        }
+        
+        .status-badge.working {
+            background: var(--status-working);
+            color: white;
+        }
+        
+        .status-badge.closed {
+            background: var(--status-closed);
+            color: white;
         }
         
         .chat-status {
@@ -560,7 +595,6 @@
             cursor: pointer;
         }
         
-        /* Badge для активного фильтра */
         .filter-badge {
             background: var(--accent);
             color: white;
@@ -594,7 +628,6 @@
                 </button>
             </div>
             
-            <!-- Скрываемая панель фильтрации -->
             <div class="filter-panel" id="filterPanel">
                 <div class="filter-row">
                     <span class="filter-label">📌 Статус:</span>
@@ -643,7 +676,6 @@
         </div>
     </div>
     
-    <!-- Модальное окно шаблонов -->
     <div class="modal-overlay" id="templatesModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -738,7 +770,6 @@
         
         function clearFilters() {
             currentStatusFilter = 'all';
-            // Обновляем активную кнопку в фильтре
             document.querySelectorAll('.status-filter-btn').forEach(btn => {
                 if (btn.dataset.status === 'all') {
                     btn.classList.add('active');
@@ -748,7 +779,6 @@
             });
             updateFilterBadge();
             loadChats();
-            // Закрываем панель после применения
             if (filterPanelVisible) {
                 toggleFilterPanel();
             }
@@ -764,7 +794,6 @@
                     currentStatusFilter = btn.dataset.status;
                     updateFilterBadge();
                     loadChats();
-                    // Закрываем панель после применения фильтра
                     if (filterPanelVisible) {
                         toggleFilterPanel();
                     }
@@ -775,7 +804,27 @@
         document.getElementById('filterToggleBtn')?.addEventListener('click', toggleFilterPanel);
         document.getElementById('clearFilterBtn')?.addEventListener('click', clearFilters);
         
-        // ========== ЗАГРУЗКА ЧАТОВ ==========
+        // ========== ЗАГРУЗКА ЧАТОВ (с цветными статусами) ==========
+        function getStatusBadgeClass(status) {
+            const statusMap = {
+                'первое сообщение': 'new',
+                'ожидание менеджера': 'waiting',
+                'в работе': 'working',
+                'закрыт': 'closed'
+            };
+            return statusMap[status] || 'new';
+        }
+        
+        function getStatusDisplayName(status) {
+            const statusMap = {
+                'первое сообщение': '🆕 Первое сообщение',
+                'ожидание менеджера': '📞 Ожидает менеджера',
+                'в работе': '⚙️ В работе',
+                'закрыт': '✅ Закрыт'
+            };
+            return statusMap[status] || status;
+        }
+        
         async function loadChats() {
             try {
                 let url = '/api/chats';
@@ -791,19 +840,24 @@
                     return;
                 }
                 
-                container.innerHTML = data.chats.map(chat => `
-                    <div class="chat-item" onclick="selectChat(${chat.id})" data-chat-id="${chat.id}">
-                        <div class="chat-name">${escapeHtml(chat.full_name || chat.username || 'User')}</div>
-                        <div class="chat-status">${escapeHtml(chat.dialog_status || 'новый')}</div>
-                        <div class="chat-status">ID: ${chat.user_id}</div>
-                    </div>
-                `).join('');
+                container.innerHTML = data.chats.map(chat => {
+                    const statusClass = getStatusBadgeClass(chat.dialog_status);
+                    const statusDisplay = getStatusDisplayName(chat.dialog_status);
+                    return `
+                        <div class="chat-item" onclick="selectChat(${chat.id})" data-chat-id="${chat.id}">
+                            <div class="chat-name">${escapeHtml(chat.full_name || chat.username || 'User')}</div>
+                            <div class="status-badge ${statusClass}">${statusDisplay}</div>
+                            <div class="chat-status">ID: ${chat.user_id}</div>
+                        </div>
+                    `;
+                }).join('');
             } catch(e) {
                 console.error(e);
             }
         }
         
         function escapeHtml(text) {
+            if (!text) return '';
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
@@ -879,7 +933,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status })
             });
-            loadChats(); // Обновляем список чатов
+            loadChats();
         }
         
         // ========== ПЕРЕКЛЮЧЕНИЕ АВТОРЕЖИМА ==========
@@ -999,7 +1053,6 @@
             if (currentChatId) loadMessages(currentChatId);
         }, 10000);
         
-        // Делаем функции глобальными
         window.selectChat = selectChat;
         window.useTemplate = useTemplate;
         window.addTemplate = addTemplate;
