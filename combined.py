@@ -28,7 +28,6 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
 # ==================== НАСТРОЙКИ ====================
-# Токен по умолчанию (будет заменён при выборе бота в CRM)
 DEFAULT_BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = [5683729883]
 DATABASE_URL = "postgresql://neondb_owner:npg_ZS6yvHDEwa1G@ep-winter-dust-al1pbd4y.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require"
@@ -80,113 +79,113 @@ class Database:
         logger.info("✅ База данных подключена")
 
     async def init_tables(self):
-    async with self.pool.acquire() as conn:
-        # Таблица ботов
-        await conn.execute('''
-            CREATE TABLE IF NOT EXISTS bot_instances (
-                id SERIAL PRIMARY KEY,
-                name TEXT NOT NULL,
-                bot_token TEXT NOT NULL,
-                is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        ''')
-        
-        # Добавляем ботов по умолчанию, если их нет
-        await conn.execute('''
-            INSERT INTO bot_instances (name, bot_token) 
-            VALUES ('RobotChoiceBot', $1)
-            ON CONFLICT DO NOTHING
-        ''', DEFAULT_BOT_TOKEN)
-        
-        # Таблица пользователей
-        await conn.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                user_id BIGINT PRIMARY KEY,
-                username TEXT,
-                full_name TEXT,
-                first_seen TIMESTAMP DEFAULT NOW(),
-                last_active TIMESTAMP DEFAULT NOW()
-            )
-        ''')
-        
-        # Добавляем колонки (если их нет)
-        await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
-        await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_source TEXT')
-        await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_medium TEXT')
-        await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_campaign TEXT')
-        await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_content TEXT')
-        await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_term TEXT')
-        await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS referrer TEXT')
-        await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS start_param TEXT')
-        await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS gclid TEXT')
-        
-        # Таблица чатов
-        await conn.execute('''
-            CREATE TABLE IF NOT EXISTS chats (
-                id SERIAL PRIMARY KEY,
-                user_id BIGINT REFERENCES users(user_id),
-                bot_id INTEGER REFERENCES bot_instances(id),
-                dialog_status TEXT DEFAULT 'первое сообщение',
-                auto_mode BOOLEAN DEFAULT TRUE,
-                is_blocked BOOLEAN DEFAULT FALSE,
-                tags TEXT,
-                created_at TIMESTAMP DEFAULT NOW(),
-                last_message_at TIMESTAMP DEFAULT NOW()
-            )
-        ''')
-        
-        # Таблица сообщений
-        await conn.execute('''
-            CREATE TABLE IF NOT EXISTS messages (
-                id SERIAL PRIMARY KEY,
-                chat_id INTEGER REFERENCES chats(id),
-                sender_type TEXT,
-                message_text TEXT,
-                file_id TEXT,
-                timestamp TIMESTAMP DEFAULT NOW()
-            )
-        ''')
-        
-        # Таблица для хранения истории UTM-меток
-        await conn.execute('''
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                id SERIAL PRIMARY KEY,
-                user_id BIGINT REFERENCES users(user_id),
-                bot_id INTEGER REFERENCES bot_instances(id),
-                utm_source TEXT,
-                utm_medium TEXT,
-                utm_campaign TEXT,
-                utm_content TEXT,
-                utm_term TEXT,
-                referrer TEXT,
-                start_param TEXT,
-                gclid TEXT,
-                first_interaction TIMESTAMP DEFAULT NOW(),
-                last_interaction TIMESTAMP DEFAULT NOW()
-            )
-        ''')
-        
-        # Таблица статистики
-        await conn.execute('''
-            CREATE TABLE IF NOT EXISTS crm_stats (
-                id SERIAL PRIMARY KEY,
-                bot_id INTEGER REFERENCES bot_instances(id),
-                date DATE UNIQUE,
-                new_chats INTEGER DEFAULT 0,
-                active_chats INTEGER DEFAULT 0,
-                closed_chats INTEGER DEFAULT 0,
-                avg_response_time INTEGER DEFAULT 0
-            )
-        ''')
-        
-        # Создаём индексы (ТОЛЬКО ПОСЛЕ того, как колонки существуют)
-        await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_bot_id ON users(bot_id)')
-        await conn.execute('CREATE INDEX IF NOT EXISTS idx_chats_bot_id ON chats(bot_id)')
-        await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_source ON users(utm_source)')
-        await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_campaign ON users(utm_campaign)')
-        
-        logger.info("✅ Таблицы созданы")
+        async with self.pool.acquire() as conn:
+            # Таблица ботов
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS bot_instances (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    bot_token TEXT NOT NULL,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            ''')
+            
+            # Добавляем ботов по умолчанию, если их нет
+            await conn.execute('''
+                INSERT INTO bot_instances (name, bot_token) 
+                VALUES ('RobotChoiceBot', $1)
+                ON CONFLICT DO NOTHING
+            ''', DEFAULT_BOT_TOKEN)
+            
+            # Таблица пользователей
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id BIGINT PRIMARY KEY,
+                    username TEXT,
+                    full_name TEXT,
+                    first_seen TIMESTAMP DEFAULT NOW(),
+                    last_active TIMESTAMP DEFAULT NOW()
+                )
+            ''')
+            
+            # Добавляем колонки (если их нет)
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_source TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_medium TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_campaign TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_content TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_term TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS referrer TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS start_param TEXT')
+            await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS gclid TEXT')
+            
+            # Таблица чатов
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS chats (
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT REFERENCES users(user_id),
+                    bot_id INTEGER REFERENCES bot_instances(id),
+                    dialog_status TEXT DEFAULT 'первое сообщение',
+                    auto_mode BOOLEAN DEFAULT TRUE,
+                    is_blocked BOOLEAN DEFAULT FALSE,
+                    tags TEXT,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    last_message_at TIMESTAMP DEFAULT NOW()
+                )
+            ''')
+            
+            # Таблица сообщений
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS messages (
+                    id SERIAL PRIMARY KEY,
+                    chat_id INTEGER REFERENCES chats(id),
+                    sender_type TEXT,
+                    message_text TEXT,
+                    file_id TEXT,
+                    timestamp TIMESTAMP DEFAULT NOW()
+                )
+            ''')
+            
+            # Таблица для хранения истории UTM-меток
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS user_sessions (
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT REFERENCES users(user_id),
+                    bot_id INTEGER REFERENCES bot_instances(id),
+                    utm_source TEXT,
+                    utm_medium TEXT,
+                    utm_campaign TEXT,
+                    utm_content TEXT,
+                    utm_term TEXT,
+                    referrer TEXT,
+                    start_param TEXT,
+                    gclid TEXT,
+                    first_interaction TIMESTAMP DEFAULT NOW(),
+                    last_interaction TIMESTAMP DEFAULT NOW()
+                )
+            ''')
+            
+            # Таблица статистики
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS crm_stats (
+                    id SERIAL PRIMARY KEY,
+                    bot_id INTEGER REFERENCES bot_instances(id),
+                    date DATE UNIQUE,
+                    new_chats INTEGER DEFAULT 0,
+                    active_chats INTEGER DEFAULT 0,
+                    closed_chats INTEGER DEFAULT 0,
+                    avg_response_time INTEGER DEFAULT 0
+                )
+            ''')
+            
+            # Создаём индексы (ТОЛЬКО ПОСЛЕ того, как колонки существуют)
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_bot_id ON users(bot_id)')
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_chats_bot_id ON chats(bot_id)')
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_source ON users(utm_source)')
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_campaign ON users(utm_campaign)')
+            
+            logger.info("✅ Таблицы созданы")
 
     async def get_active_bot(self):
         """Получить активного бота"""
@@ -211,14 +210,11 @@ class Database:
     async def get_or_create_chat(self, user_id: int, username: str = None, 
                                   full_name: str = None, start_param: str = None):
         async with self.pool.acquire() as conn:
-            # Получаем активного бота
             active_bot = await self.get_active_bot()
             bot_id = active_bot['id'] if active_bot else 1
             
-            # Парсим UTM из start_param
             utm_data = parse_utm_from_start_param(start_param)
             
-            # Добавляем/обновляем пользователя
             await conn.execute('''
                 INSERT INTO users (user_id, username, full_name, bot_id,
                                    utm_source, utm_medium, utm_campaign, 
@@ -235,7 +231,6 @@ class Database:
                utm_data.get('start_param', start_param),
                utm_data.get('gclid'))
             
-            # Создаём запись о сессии
             await conn.execute('''
                 INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
                                            utm_campaign, utm_content, utm_term, 
@@ -248,7 +243,6 @@ class Database:
                utm_data.get('start_param', start_param),
                utm_data.get('gclid'))
             
-            # Получаем или создаём чат
             row = await conn.fetchrow('SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2', user_id, bot_id)
             if row:
                 return dict(row)
@@ -323,7 +317,6 @@ class Database:
             return dict(row) if row else None
     
     async def get_utm_stats(self):
-        """Получить статистику по UTM-меткам для текущего бота"""
         async with self.pool.acquire() as conn:
             active_bot = await self.get_active_bot()
             bot_id = active_bot['id'] if active_bot else 1
@@ -363,20 +356,16 @@ class Database:
 # ==================== БОТ ====================
 db = Database()
 
-# Глобальная функция для обновления бота
 async def update_bot_instance(new_token: str, new_name: str):
     global bot, dp, current_bot_token, current_bot_name
     current_bot_token = new_token
     current_bot_name = new_name
     bot = Bot(token=current_bot_token)
     dp = Dispatcher(storage=MemoryStorage())
-    # Регистрируем обработчики
     register_handlers()
     logger.info(f"✅ Бот переключён на: {current_bot_name}")
 
 def register_handlers():
-    """Регистрация обработчиков бота"""
-    
     @dp.message(Command("start"))
     async def cmd_start(message: types.Message):
         user = message.from_user
@@ -534,7 +523,6 @@ def register_handlers():
                 except:
                     pass
 
-# Регистрируем обработчики при запуске
 register_handlers()
 
 # ==================== API ДЛЯ CRM ====================
@@ -556,7 +544,6 @@ app.add_middleware(
 
 templates = Jinja2Templates(directory="templates")
 
-# Эндпоинт для вебхука
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
     update = await request.json()
@@ -568,16 +555,13 @@ async def telegram_webhook(request: Request):
 async def health():
     return {"status": "ok"}
 
-# ==================== API ДЛЯ УПРАВЛЕНИЯ БОТАМИ ====================
 @app.get("/api/bots")
 async def get_bots():
-    """Получить список всех ботов"""
     bots = await db.get_all_bots()
     return {"bots": bots}
 
 @app.post("/api/bots/switch")
 async def switch_bot(request: Request):
-    """Переключить активного бота"""
     data = await request.json()
     bot_id = data.get("bot_id")
     
@@ -589,7 +573,6 @@ async def switch_bot(request: Request):
     
     return {"status": "switched", "bot_name": bot_data['name']}
 
-# ==================== CRM API ====================
 @app.get("/api/chats")
 async def get_chats(limit: int = 50, offset: int = 0, status: str = None):
     chats = await db.get_all_chats(limit, offset, status)
@@ -645,13 +628,11 @@ async def toggle_auto(chat_id: int):
 async def mark_read(chat_id: int):
     return {"status": "ok"}
 
-# ==================== UTM СТАТИСТИКА ====================
 @app.get("/api/utm_stats")
 async def get_utm_stats():
     stats = await db.get_utm_stats()
     return stats
 
-# ==================== ЭКСПОРТ CSV ====================
 @app.get("/api/export/csv")
 async def export_csv(chat_id: int = None):
     from io import StringIO
@@ -687,7 +668,6 @@ async def export_csv(chat_id: int = None):
     )
     return response
 
-# ==================== ЭКСПОРТ PDF ====================
 @app.get("/api/export/pdf")
 async def export_pdf(chat_id: int = None):
     from datetime import datetime
@@ -731,7 +711,6 @@ async def export_pdf(chat_id: int = None):
     )
     return response
 
-# ==================== ЭКСПОРТ ПО ПЕРИОДУ ====================
 @app.get("/api/export/period")
 async def export_period(from_date: str, to_date: str):
     from io import StringIO
@@ -776,7 +755,6 @@ async def export_period(from_date: str, to_date: str):
     )
     return response
 
-# ==================== ШАБЛОНЫ ОТВЕТОВ ====================
 templates_storage = []
 
 @app.get("/api/templates")
@@ -801,12 +779,10 @@ async def create_template(request: Request):
     })
     return {"id": template_id, "title": title, "text": text}
 
-# ==================== ВЕБ-ДАШБОРД ====================
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
-# ==================== ЗАПУСК ====================
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 10000))
