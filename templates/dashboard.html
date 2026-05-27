@@ -73,6 +73,65 @@
             transition: background 0.3s ease, color 0.2s ease;
         }
         
+        /* ========== ИСПРАВЛЕНИЕ ВСПЛЫВАЮЩИХ ПОДСКАЗОК ========== */
+        .tabs, .main-content, .chats-sidebar, .messages-area {
+            overflow: visible;
+        }
+        
+        .chats-header {
+            position: relative;
+            z-index: 10;
+            overflow: visible;
+        }
+        
+        .filter-btn, .collapse-btn {
+            position: relative;
+            z-index: 20;
+        }
+        
+        /* Стилизованные подсказки через data-tooltip */
+        [data-tooltip] {
+            position: relative;
+            cursor: help;
+        }
+        
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: fixed;
+            background: var(--tooltip-bg);
+            color: var(--tooltip-text);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: normal;
+            white-space: nowrap;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            pointer-events: none;
+            top: auto;
+            bottom: auto;
+            left: auto;
+            transform: none;
+            margin-top: 28px;
+            margin-left: -10px;
+        }
+        
+        [data-tooltip]:hover::before {
+            content: '';
+            position: fixed;
+            border: 6px solid transparent;
+            border-bottom-color: var(--tooltip-bg);
+            z-index: 10000;
+            pointer-events: none;
+            margin-top: 16px;
+            margin-left: 5px;
+        }
+        
+        /* Стандартные подсказки через title */
+        [title] {
+            cursor: help;
+        }
+        
         .header {
             background: var(--accent);
             color: white;
@@ -81,6 +140,8 @@
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 100;
         }
         
         .header-left h1 {
@@ -205,6 +266,9 @@
             padding: 10px 20px;
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border);
+            position: relative;
+            z-index: 5;
+            overflow: visible;
         }
         
         .tab-btn {
@@ -231,42 +295,6 @@
             border-color: var(--accent);
         }
         
-        [data-tooltip] {
-            position: relative;
-        }
-        
-        [data-tooltip]:hover::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            margin-bottom: 8px;
-            padding: 6px 12px;
-            background: var(--tooltip-bg);
-            color: var(--tooltip-text);
-            font-size: 11px;
-            font-weight: normal;
-            white-space: nowrap;
-            border-radius: 6px;
-            z-index: 1000;
-            pointer-events: none;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-        
-        [data-tooltip]:hover::before {
-            content: '';
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            margin-bottom: 2px;
-            border: 5px solid transparent;
-            border-top-color: var(--tooltip-bg);
-            z-index: 1000;
-            pointer-events: none;
-        }
-        
         .tab-content {
             display: none;
         }
@@ -280,6 +308,7 @@
         .main-content {
             display: flex;
             height: calc(100vh - 95px);
+            overflow: visible;
         }
         
         .chats-sidebar {
@@ -289,7 +318,7 @@
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            overflow: visible;
             transition: width 0.3s ease, min-width 0.3s ease, opacity 0.3s ease;
         }
         
@@ -308,6 +337,9 @@
             color: var(--text-primary);
             background: var(--bg-sidebar);
             font-size: 14px;
+            position: relative;
+            z-index: 10;
+            overflow: visible;
         }
         
         .filter-btn {
@@ -323,6 +355,7 @@
             gap: 4px;
             transition: all 0.2s;
             position: relative;
+            z-index: 20;
         }
         
         .filter-btn:hover {
@@ -345,6 +378,7 @@
             font-size: 12px;
             transition: all 0.2s;
             position: relative;
+            z-index: 20;
         }
         
         .collapse-btn:hover {
@@ -491,6 +525,7 @@
             display: flex;
             flex-direction: column;
             background: var(--bg-primary);
+            overflow: visible;
         }
         
         .messages-header {
@@ -1029,12 +1064,12 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <span>📋 Чаты</span>
                         <div style="display: flex; gap: 6px;">
-                            <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу" data-tooltip="Фильтровать чаты по статусу диалога">
+                            <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу (показать/скрыть панель)">
                                 <span>🔍</span>
                                 <span>Фильтр</span>
                                 <span id="filterBadge" class="filter-badge" style="display: none;"></span>
                             </button>
-                            <button class="collapse-btn" id="collapseBtn" title="Свернуть панель" data-tooltip="Скрыть панель чатов для экономии места">
+                            <button class="collapse-btn" id="collapseBtn" title="Свернуть/развернуть панель чатов">
                                 <span class="collapse-icon" id="collapseIcon">◀</span>
                             </button>
                         </div>
@@ -1050,13 +1085,13 @@
                     <div class="filter-row">
                         <span class="filter-label">📌 Статус:</span>
                         <div class="status-filter" id="statusFilter">
-                            <button class="status-filter-btn active" data-status="all" data-tooltip="Показать все чаты без фильтрации">Все</button>
-                            <button class="status-filter-btn" data-status="первое сообщение" data-tooltip="Клиент только написал первое сообщение">🆕 Первое</button>
-                            <button class="status-filter-btn" data-status="ожидание менеджера" data-tooltip="Клиент ожидает ответа от менеджера">📞 Ожидание</button>
-                            <button class="status-filter-btn" data-status="в работе" data-tooltip="Менеджер взял чат в работу">⚙️ В работе</button>
-                            <button class="status-filter-btn" data-status="закрыт" data-tooltip="Диалог завершён">✅ Закрыт</button>
+                            <button class="status-filter-btn active" data-status="all" title="Показать все чаты без фильтрации">Все</button>
+                            <button class="status-filter-btn" data-status="первое сообщение" title="Клиент только написал первое сообщение">🆕 Первое</button>
+                            <button class="status-filter-btn" data-status="ожидание менеджера" title="Клиент ожидает ответа от менеджера">📞 Ожидание</button>
+                            <button class="status-filter-btn" data-status="в работе" title="Менеджер взял чат в работу">⚙️ В работе</button>
+                            <button class="status-filter-btn" data-status="закрыт" title="Диалог завершён">✅ Закрыт</button>
                         </div>
-                        <span class="filter-clear" id="clearFilterBtn" data-tooltip="Сбросить все фильтры">✕ сбросить</span>
+                        <span class="filter-clear" id="clearFilterBtn" title="Сбросить все фильтры">✕ сбросить</span>
                     </div>
                 </div>
                 
@@ -1070,31 +1105,31 @@
                     <div class="toolbar-full" id="toolbarFull">
                         <div><strong id="chatName" class="selected-chat-name"></strong></div>
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <select id="statusSelect" class="status-select" data-tooltip="Изменить статус диалога">
+                            <select id="statusSelect" class="status-select" title="Изменить статус диалога">
                                 <option value="первое сообщение">первое сообщение</option>
                                 <option value="ожидание менеджера">ожидание менеджера</option>
                                 <option value="в работе">в работе</option>
                                 <option value="закрыт">закрыт</option>
                             </select>
-                            <button id="toggleAutoBtn" class="toggle-auto-btn" data-tooltip="Включить/выключить автоответы бота">Авторежим ВКЛ</button>
-                            <button id="templatesBtn" class="templates-btn" data-tooltip="Использовать готовые шаблоны ответов">📋 Шаблоны</button>
+                            <button id="toggleAutoBtn" class="toggle-auto-btn" title="Включить/выключить автоответы бота">Авторежим ВКЛ</button>
+                            <button id="templatesBtn" class="templates-btn" title="Использовать готовые шаблоны ответов">📋 Шаблоны</button>
                             <div class="export-buttons">
-                                <input type="date" id="exportDateFrom" class="date-input" data-tooltip="Начало периода для экспорта">
-                                <input type="date" id="exportDateTo" class="date-input" data-tooltip="Конец периода для экспорта">
-                                <button id="exportPeriodBtn" class="export-link" data-tooltip="Экспортировать чаты за выбранный период">📊 Экспорт</button>
-                                <a href="/api/export/csv" class="export-link" data-tooltip="Экспорт всех чатов в CSV">📥 CSV</a>
-                                <a href="/api/export/pdf" class="export-link" data-tooltip="Экспорт всех чатов в PDF">📄 PDF</a>
+                                <input type="date" id="exportDateFrom" class="date-input" title="Начало периода для экспорта">
+                                <input type="date" id="exportDateTo" class="date-input" title="Конец периода для экспорта">
+                                <button id="exportPeriodBtn" class="export-link" title="Экспортировать чаты за выбранный период">📊 Экспорт</button>
+                                <a href="/api/export/csv" class="export-link" title="Экспорт всех чатов в CSV">📥 CSV</a>
+                                <a href="/api/export/pdf" class="export-link" title="Экспорт всех чатов в PDF">📄 PDF</a>
                             </div>
                         </div>
                     </div>
                     <div class="toolbar-compact" id="toolbarCompact">
                         <div><strong id="chatNameCompact" class="selected-chat-name"></strong></div>
                         <div class="compact-status" id="compactStatus">Статус</div>
-                        <button class="compact-btn" id="compactAutoBtn" data-tooltip="Включить/выключить автоответы бота">🤖</button>
-                        <button class="compact-btn" id="compactTemplatesBtn" data-tooltip="Использовать готовые шаблоны ответов">📋</button>
-                        <button class="compact-btn" id="compactExportBtn" data-tooltip="Экспортировать чаты за выбранный период">📊</button>
-                        <a href="/api/export/csv" class="compact-btn" data-tooltip="Экспорт всех чатов в CSV">📥</a>
-                        <a href="/api/export/pdf" class="compact-btn" data-tooltip="Экспорт всех чатов в PDF">📄</a>
+                        <button class="compact-btn" id="compactAutoBtn" title="Включить/выключить автоответы бота">🤖</button>
+                        <button class="compact-btn" id="compactTemplatesBtn" title="Использовать готовые шаблоны ответов">📋</button>
+                        <button class="compact-btn" id="compactExportBtn" title="Экспортировать чаты за выбранный период">📊</button>
+                        <a href="/api/export/csv" class="compact-btn" title="Экспорт всех чатов в CSV">📥</a>
+                        <a href="/api/export/pdf" class="compact-btn" title="Экспорт всех чатов в PDF">📄</a>
                     </div>
                     
                     <!-- UTM-МЕТКИ ТЕКУЩЕГО КЛИЕНТА -->
@@ -1112,7 +1147,7 @@
                 <div class="messages-container" id="messagesContainer"></div>
                 <div class="message-input-container">
                     <textarea class="message-input" id="messageInput" placeholder="Написать сообщение..." rows="1"></textarea>
-                    <button class="send-button" id="sendBtn" data-tooltip="Отправить сообщение (Enter)">➤</button>
+                    <button class="send-button" id="sendBtn" title="Отправить сообщение (Enter)">➤</button>
                 </div>
             </div>
         </div>
