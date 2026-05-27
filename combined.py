@@ -28,12 +28,20 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
 # ==================== НАСТРОЙКИ ====================
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+# Токен по умолчанию (будет заменён при выборе бота в CRM)
+DEFAULT_BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = [5683729883]
 DATABASE_URL = "postgresql://neondb_owner:npg_ZS6yvHDEwa1G@ep-winter-dust-al1pbd4y.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Глобальные переменные для текущего бота
+current_bot_token = DEFAULT_BOT_TOKEN
+current_bot_name = "RobotChoiceBot"
+bot = Bot(token=current_bot_token) if current_bot_token else None
+storage = MemoryStorage()
+dp = Dispatcher(storage=storage)
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def parse_utm_from_start_param(start_param: str) -> dict:
@@ -73,6 +81,24 @@ class Database:
 
     async def init_tables(self):
         async with self.pool.acquire() as conn:
+            # Таблица ботов
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS bot_instances (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    bot_token TEXT NOT NULL,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            ''')
+            
+            # Добавляем ботов по умолчанию, если их нет
+            await conn.execute('''
+                INSERT INTO bot_instances (name, bot_token) 
+                VALUES ('RobotChoiceBot', $1)
+                ON CONFLICT DO NOTHING
+            ''', DEFAULT_BOT_TOKEN)
+            
             # Таблица пользователей
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS users (
@@ -80,7 +106,8 @@ class Database:
                     username TEXT,
                     full_name TEXT,
                     first_seen TIMESTAMP DEFAULT NOW(),
-                    last_active TIMESTAMP DEFAULT NOW()
+                    last_active TIMESTAMP DEFAULT NOW(),
+                    bot_id INTEGER REFERENCES bot_instances(id)
                 )
             ''')
             
@@ -94,11 +121,12 @@ class Database:
             await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS start_param TEXT')
             await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS gclid TEXT')
             
-            # Таблица чатов (диалогов)
+            # Таблица чатов
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS chats (
                     id SERIAL PRIMARY KEY,
                     user_id BIGINT REFERENCES users(user_id),
+                    bot_id INTEGER REFERENCES bot_instances(id),
                     dialog_status TEXT DEFAULT 'первое сообщение',
                     auto_mode BOOLEAN DEFAULT TRUE,
                     is_blocked BOOLEAN DEFAULT FALSE,
@@ -120,11 +148,12 @@ class Database:
                 )
             ''')
             
-            # Таблица для хранения истории UTM-меток (по сессиям)
+            # Таблица для хранения истории UTM-меток
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS user_sessions (
                     id SERIAL PRIMARY KEY,
                     user_id BIGINT REFERENCES users(user_id),
+                    bot_id INTEGER REFERENCES bot_instances(id),
                     utm_source TEXT,
                     utm_medium TEXT,
                     utm_campaign TEXT,
@@ -142,6 +171,7 @@ class Database:
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS crm_stats (
                     id SERIAL PRIMARY KEY,
+                    bot_id INTEGER REFERENCES bot_instances(id),
                     date DATE UNIQUE,
                     new_chats INTEGER DEFAULT 0,
                     active_chats INTEGER DEFAULT 0,
@@ -150,30 +180,55 @@ class Database:
                 )
             ''')
             
-            # Создаём индексы ТОЛЬКО ПОСЛЕ того, как колонки существуют
+            # Создаём индексы
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_bot_id ON users(bot_id)')
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_chats_bot_id ON chats(bot_id)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_source ON users(utm_source)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_campaign ON users(utm_campaign)')
-            await conn.execute('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON user_sessions(user_id)')
             
             logger.info("✅ Таблицы созданы")
+
+    async def get_active_bot(self):
+        """Получить активного бота"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow('SELECT * FROM bot_instances WHERE is_active = TRUE LIMIT 1')
+            return dict(row) if row else None
+
+    async def set_active_bot(self, bot_id: int):
+        """Установить активного бота"""
+        async with self.pool.acquire() as conn:
+            await conn.execute('UPDATE bot_instances SET is_active = FALSE')
+            await conn.execute('UPDATE bot_instances SET is_active = TRUE WHERE id = $1', bot_id)
+            row = await conn.fetchrow('SELECT * FROM bot_instances WHERE id = $1', bot_id)
+            return dict(row) if row else None
+
+    async def get_all_bots(self):
+        """Получить всех ботов"""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('SELECT id, name, bot_token, is_active FROM bot_instances ORDER BY id')
+            return [dict(r) for r in rows]
 
     async def get_or_create_chat(self, user_id: int, username: str = None, 
                                   full_name: str = None, start_param: str = None):
         async with self.pool.acquire() as conn:
+            # Получаем активного бота
+            active_bot = await self.get_active_bot()
+            bot_id = active_bot['id'] if active_bot else 1
+            
             # Парсим UTM из start_param
             utm_data = parse_utm_from_start_param(start_param)
             
-            # Добавляем/обновляем пользователя с UTM-метками
+            # Добавляем/обновляем пользователя
             await conn.execute('''
-                INSERT INTO users (user_id, username, full_name, 
+                INSERT INTO users (user_id, username, full_name, bot_id,
                                    utm_source, utm_medium, utm_campaign, 
                                    utm_content, utm_term, referrer, start_param, gclid)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                 ON CONFLICT (user_id) DO UPDATE
                 SET username = EXCLUDED.username, 
                     full_name = EXCLUDED.full_name,
                     last_active = NOW()
-            ''', user_id, username, full_name,
+            ''', user_id, username, full_name, bot_id,
                utm_data.get('utm_source'), utm_data.get('utm_medium'),
                utm_data.get('utm_campaign'), utm_data.get('utm_content'),
                utm_data.get('utm_term'), utm_data.get('referrer'),
@@ -182,11 +237,11 @@ class Database:
             
             # Создаём запись о сессии
             await conn.execute('''
-                INSERT INTO user_sessions (user_id, utm_source, utm_medium, 
+                INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
                                            utm_campaign, utm_content, utm_term, 
                                            referrer, start_param, gclid)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            ''', user_id,
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ''', user_id, bot_id,
                utm_data.get('utm_source'), utm_data.get('utm_medium'),
                utm_data.get('utm_campaign'), utm_data.get('utm_content'),
                utm_data.get('utm_term'), utm_data.get('referrer'),
@@ -194,15 +249,15 @@ class Database:
                utm_data.get('gclid'))
             
             # Получаем или создаём чат
-            row = await conn.fetchrow('SELECT * FROM chats WHERE user_id = $1', user_id)
+            row = await conn.fetchrow('SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2', user_id, bot_id)
             if row:
                 return dict(row)
             else:
                 row = await conn.fetchrow('''
-                    INSERT INTO chats (user_id)
-                    VALUES ($1)
+                    INSERT INTO chats (user_id, bot_id)
+                    VALUES ($1, $2)
                     RETURNING *
-                ''', user_id)
+                ''', user_id, bot_id)
                 return dict(row)
 
     async def save_message(self, chat_id: int, sender_type: str, message_text: str = None, file_id: str = None):
@@ -227,13 +282,16 @@ class Database:
 
     async def get_all_chats(self, limit: int = 50, offset: int = 0, status_filter: str = None):
         async with self.pool.acquire() as conn:
+            active_bot = await self.get_active_bot()
+            bot_id = active_bot['id'] if active_bot else 1
+            
             query = '''
                 SELECT c.*, u.username, u.full_name, u.utm_source, u.utm_campaign
                 FROM chats c
                 JOIN users u ON c.user_id = u.user_id
-                WHERE c.is_blocked = FALSE
+                WHERE c.bot_id = $1 AND c.is_blocked = FALSE
             '''
-            params = []
+            params = [bot_id]
             if status_filter:
                 query += ' AND c.dialog_status = $' + str(len(params) + 1)
                 params.append(status_filter)
@@ -265,227 +323,219 @@ class Database:
             return dict(row) if row else None
     
     async def get_utm_stats(self):
-        """Получить статистику по UTM-меткам"""
+        """Получить статистику по UTM-меткам для текущего бота"""
         async with self.pool.acquire() as conn:
-            # Общая статистика по UTM-источникам
+            active_bot = await self.get_active_bot()
+            bot_id = active_bot['id'] if active_bot else 1
+            
             sources = await conn.fetch('''
                 SELECT utm_source, COUNT(*) as count 
                 FROM users 
-                WHERE utm_source IS NOT NULL 
+                WHERE utm_source IS NOT NULL AND bot_id = $1
                 GROUP BY utm_source 
                 ORDER BY count DESC
-            ''')
+            ''', bot_id)
             
-            # Статистика по кампаниям
             campaigns = await conn.fetch('''
                 SELECT utm_campaign, COUNT(*) as count 
                 FROM users 
-                WHERE utm_campaign IS NOT NULL 
+                WHERE utm_campaign IS NOT NULL AND bot_id = $1
                 GROUP BY utm_campaign 
                 ORDER BY count DESC
-            ''')
+            ''', bot_id)
             
-            # Конверсии по UTM (пользователи, дошедшие до контакта с менеджером)
             conversions = await conn.fetch('''
                 SELECT u.utm_source, COUNT(DISTINCT u.user_id) as count
                 FROM users u
                 JOIN chats c ON u.user_id = c.user_id
-                WHERE (c.dialog_status = 'ожидание менеджера' OR c.dialog_status = 'в работе')
+                WHERE c.bot_id = $1 AND (c.dialog_status = 'ожидание менеджера' OR c.dialog_status = 'в работе')
                   AND u.utm_source IS NOT NULL
                 GROUP BY u.utm_source
                 ORDER BY count DESC
-            ''')
-            
-            # Динамика по дням (новые пользователи по источникам)
-            daily = await conn.fetch('''
-                SELECT DATE(first_seen) as date, utm_source, COUNT(*) as count
-                FROM users
-                WHERE utm_source IS NOT NULL AND first_seen > NOW() - INTERVAL '30 days'
-                GROUP BY DATE(first_seen), utm_source
-                ORDER BY date DESC
-            ''')
+            ''', bot_id)
             
             return {
                 "sources": [dict(r) for r in sources],
                 "campaigns": [dict(r) for r in campaigns],
-                "conversions": [dict(r) for r in conversions],
-                "daily": [{"date": r['date'].isoformat(), "source": r['utm_source'], "count": r['count']} for r in daily]
+                "conversions": [dict(r) for r in conversions]
             }
 
 # ==================== БОТ ====================
 db = Database()
-bot = Bot(token=BOT_TOKEN)
-storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
 
-class Form(StatesGroup):
-    waiting_for_answer = State()
+# Глобальная функция для обновления бота
+async def update_bot_instance(new_token: str, new_name: str):
+    global bot, dp, current_bot_token, current_bot_name
+    current_bot_token = new_token
+    current_bot_name = new_name
+    bot = Bot(token=current_bot_token)
+    dp = Dispatcher(storage=MemoryStorage())
+    # Регистрируем обработчики
+    register_handlers()
+    logger.info(f"✅ Бот переключён на: {current_bot_name}")
 
-# Команда /start
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    user = message.from_user
-    # Получаем start_param (если есть)
-    start_param = message.text.replace('/start', '').strip()
-    if start_param.startswith(' '):
-        start_param = start_param[1:]
-    if start_param == '':
-        start_param = None
+def register_handlers():
+    """Регистрация обработчиков бота"""
     
-    chat_data = await db.get_or_create_chat(
-        user.id, user.username, user.full_name, start_param
-    )
-    
-    # Если есть UTM-метки, логируем
-    if start_param:
-        logger.info(f"New user {user.id} from: {start_param}")
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📊 Посмотреть услуги", callback_data="services")],
-        [InlineKeyboardButton(text="💬 Связаться с менеджером", callback_data="contact_manager")]
-    ])
-    
-    await message.answer(
-        "🤖 *Добро пожаловать в RobotChoiceBot!*\n\n"
-        "Я помогу вам подобрать и настроить торгового робота для биржи.\n\n"
-        "📌 *Что вы можете сделать:*\n"
-        "• Посмотреть список доступных роботов\n"
-        "• Получить консультацию\n"
-        "• Задать вопрос менеджеру\n\n"
-        "👇 *Выберите действие:*",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
-    
-    await db.save_message(chat_data['id'], 'user', f"/start от {user.username or user.full_name}")
-
-# Обработка callback-кнопок
-@dp.callback_query()
-async def handle_callback(callback: types.CallbackQuery):
-    chat_data = await db.get_or_create_chat(callback.from_user.id)
-    
-    if callback.data == "services":
-        text = (
-            "📊 *Наши торговые роботы:*\n\n"
-            "1. 🤖 *Gold Master* — робот для торговли золотом. Доходность: +15-25% в месяц.\n"
-            "2. 🤖 *Profit Hunter* — агрессивная стратегия. Доходность: +20-35%.\n"
-            "3. 🤖 *Smart Prime* — консервативный. Доходность: +8-12%.\n\n"
-            "💰 *Условия:*\n"
-            "• Пополнение от $100\n"
-            "• VPS в подарок\n"
-            "• Бонус до 100% на депозит\n\n"
-            "👉 *Хотите подключить робота?* Напишите менеджеру!"
-        )
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📞 Связаться с менеджером", callback_data="contact_manager")],
-            [InlineKeyboardButton(text="🔙 Назад", callback_data="back")]
-        ])
-        await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
-        await db.save_message(chat_data['id'], 'user', callback.data)
-        await db.save_message(chat_data['id'], 'bot', text)
+    @dp.message(Command("start"))
+    async def cmd_start(message: types.Message):
+        user = message.from_user
+        start_param = message.text.replace('/start', '').strip()
+        if start_param.startswith(' '):
+            start_param = start_param[1:]
+        if start_param == '':
+            start_param = None
         
-    elif callback.data == "contact_manager":
-        await db.update_dialog_status(chat_data['id'], 'ожидание менеджера')
-        text = (
-            "📞 *Менеджер скоро свяжется с вами!*\n\n"
-            "А пока вы можете:\n"
-            "• Посмотреть статистику роботов\n"
-            "• Задать вопрос в этом чате\n\n"
-            "Ожидайте ответа в течение 15 минут."
+        chat_data = await db.get_or_create_chat(
+            user.id, user.username, user.full_name, start_param
         )
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📊 Статистика роботов", callback_data="stats")],
-            [InlineKeyboardButton(text="🔙 Назад", callback_data="back")]
-        ])
-        await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
-        await db.save_message(chat_data['id'], 'user', callback.data)
-        await db.save_message(chat_data['id'], 'bot', text)
         
-        # Уведомление админу
-        for admin_id in ADMIN_IDS:
-            try:
-                await bot.send_message(
-                    admin_id,
-                    f"🆕 *Новый клиент!*\n\n"
-                    f"Пользователь: @{callback.from_user.username or callback.from_user.full_name}\n"
-                    f"ID: {callback.from_user.id}\n"
-                    f"Статус: ожидает менеджера",
-                    parse_mode="Markdown"
-                )
-            except:
-                pass
-                
-    elif callback.data == "stats":
-        text = (
-            "📈 *Живая статистика роботов:*\n\n"
-            "• GBPUSD — +5,61% — $8,198\n"
-            "• PROFIT HUNTER — +2,87% — $2,052\n"
-            "• GOLD MASTER — +1,90% — $2,756\n"
-            "• EA Smart Prime — +1,73% — $1,902\n\n"
-            "🔗 [Смотреть полную статистику](https://www.myfxbook.com/)\n\n"
-            "*Как подключить робота?*\n"
-            "1. Откройте счёт в NPB Markets\n"
-            "2. Я подключаю робота сегодня\n"
-            "3. Протестируйте и решите сами"
-        )
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📞 Хочу подключить", callback_data="contact_manager")],
-            [InlineKeyboardButton(text="🔙 Назад", callback_data="services")]
-        ])
-        await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
-        await db.save_message(chat_data['id'], 'user', callback.data)
-        await db.save_message(chat_data['id'], 'bot', text)
+        if start_param:
+            logger.info(f"New user {user.id} from: {start_param}")
         
-    elif callback.data == "back":
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📊 Посмотреть услуги", callback_data="services")],
             [InlineKeyboardButton(text="💬 Связаться с менеджером", callback_data="contact_manager")]
         ])
-        await callback.message.edit_text(
+        
+        await message.answer(
             "🤖 *Добро пожаловать в RobotChoiceBot!*\n\n"
+            "Я помогу вам подобрать и настроить торгового робота для биржи.\n\n"
+            "📌 *Что вы можете сделать:*\n"
+            "• Посмотреть список доступных роботов\n"
+            "• Получить консультацию\n"
+            "• Задать вопрос менеджеру\n\n"
             "👇 *Выберите действие:*",
             reply_markup=keyboard,
             parse_mode="Markdown"
         )
-        await db.save_message(chat_data['id'], 'user', callback.data)
-        await db.save_message(chat_data['id'], 'bot', "Возврат в главное меню")
-    
-    await callback.answer()
+        
+        await db.save_message(chat_data['id'], 'user', f"/start от {user.username or user.full_name}")
 
-# Обработка текстовых сообщений
-@dp.message()
-async def handle_message(message: types.Message):
-    user = message.from_user
-    chat_data = await db.get_or_create_chat(user.id, user.username, user.full_name)
-    
-    # Сохраняем сообщение пользователя
-    await db.save_message(chat_data['id'], 'user', message.text, message.document.file_id if message.document else None)
-    
-    # Если включён авторежим — отвечаем автоматически
-    if chat_data['auto_mode']:
-        response = (
-            "✅ *Ваше сообщение получено!*\n\n"
-            "Менеджер скоро свяжется с вами. Ожидайте ответа в течение 15 минут.\n\n"
-            "А пока вы можете:\n"
-            "• Посмотреть наших роботов → /start\n"
-            "• Изучить статистику"
-        )
-        await message.answer(response, parse_mode="Markdown")
-        await db.save_message(chat_data['id'], 'bot', response)
-    else:
-        # Уведомляем админов о новом сообщении
-        for admin_id in ADMIN_IDS:
-            try:
-                await bot.send_message(
-                    admin_id,
-                    f"💬 *Новое сообщение от пользователя!*\n\n"
-                    f"Пользователь: @{user.username or user.full_name}\n"
-                    f"ID: {user.id}\n"
-                    f"Сообщение: {message.text[:200]}",
-                    parse_mode="Markdown"
-                )
-            except:
-                pass
+    @dp.callback_query()
+    async def handle_callback(callback: types.CallbackQuery):
+        chat_data = await db.get_or_create_chat(callback.from_user.id)
+        
+        if callback.data == "services":
+            text = (
+                "📊 *Наши торговые роботы:*\n\n"
+                "1. 🤖 *Gold Master* — робот для торговли золотом. Доходность: +15-25% в месяц.\n"
+                "2. 🤖 *Profit Hunter* — агрессивная стратегия. Доходность: +20-35%.\n"
+                "3. 🤖 *Smart Prime* — консервативный. Доходность: +8-12%.\n\n"
+                "💰 *Условия:*\n"
+                "• Пополнение от $100\n"
+                "• VPS в подарок\n"
+                "• Бонус до 100% на депозит\n\n"
+                "👉 *Хотите подключить робота?* Напишите менеджеру!"
+            )
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📞 Связаться с менеджером", callback_data="contact_manager")],
+                [InlineKeyboardButton(text="🔙 Назад", callback_data="back")]
+            ])
+            await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
+            await db.save_message(chat_data['id'], 'user', callback.data)
+            await db.save_message(chat_data['id'], 'bot', text)
+            
+        elif callback.data == "contact_manager":
+            await db.update_dialog_status(chat_data['id'], 'ожидание менеджера')
+            text = (
+                "📞 *Менеджер скоро свяжется с вами!*\n\n"
+                "А пока вы можете:\n"
+                "• Посмотреть статистику роботов\n"
+                "• Задать вопрос в этом чате\n\n"
+                "Ожидайте ответа в течение 15 минут."
+            )
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📊 Статистика роботов", callback_data="stats")],
+                [InlineKeyboardButton(text="🔙 Назад", callback_data="back")]
+            ])
+            await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
+            await db.save_message(chat_data['id'], 'user', callback.data)
+            await db.save_message(chat_data['id'], 'bot', text)
+            
+            for admin_id in ADMIN_IDS:
+                try:
+                    await bot.send_message(
+                        admin_id,
+                        f"🆕 *Новый клиент!*\n\n"
+                        f"Пользователь: @{callback.from_user.username or callback.from_user.full_name}\n"
+                        f"ID: {callback.from_user.id}\n"
+                        f"Статус: ожидает менеджера",
+                        parse_mode="Markdown"
+                    )
+                except:
+                    pass
+                    
+        elif callback.data == "stats":
+            text = (
+                "📈 *Живая статистика роботов:*\n\n"
+                "• GBPUSD — +5,61% — $8,198\n"
+                "• PROFIT HUNTER — +2,87% — $2,052\n"
+                "• GOLD MASTER — +1,90% — $2,756\n"
+                "• EA Smart Prime — +1,73% — $1,902\n\n"
+                "🔗 [Смотреть полную статистику](https://www.myfxbook.com/)\n\n"
+                "*Как подключить робота?*\n"
+                "1. Откройте счёт в NPB Markets\n"
+                "2. Я подключаю робота сегодня\n"
+                "3. Протестируйте и решите сами"
+            )
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📞 Хочу подключить", callback_data="contact_manager")],
+                [InlineKeyboardButton(text="🔙 Назад", callback_data="services")]
+            ])
+            await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
+            await db.save_message(chat_data['id'], 'user', callback.data)
+            await db.save_message(chat_data['id'], 'bot', text)
+            
+        elif callback.data == "back":
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📊 Посмотреть услуги", callback_data="services")],
+                [InlineKeyboardButton(text="💬 Связаться с менеджером", callback_data="contact_manager")]
+            ])
+            await callback.message.edit_text(
+                "🤖 *Добро пожаловать в RobotChoiceBot!*\n\n"
+                "👇 *Выберите действие:*",
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+            await db.save_message(chat_data['id'], 'user', callback.data)
+            await db.save_message(chat_data['id'], 'bot', "Возврат в главное меню")
+        
+        await callback.answer()
+
+    @dp.message()
+    async def handle_message(message: types.Message):
+        user = message.from_user
+        chat_data = await db.get_or_create_chat(user.id, user.username, user.full_name)
+        
+        await db.save_message(chat_data['id'], 'user', message.text, message.document.file_id if message.document else None)
+        
+        if chat_data['auto_mode']:
+            response = (
+                "✅ *Ваше сообщение получено!*\n\n"
+                "Менеджер скоро свяжется с вами. Ожидайте ответа в течение 15 минут.\n\n"
+                "А пока вы можете:\n"
+                "• Посмотреть наших роботов → /start\n"
+                "• Изучить статистику"
+            )
+            await message.answer(response, parse_mode="Markdown")
+            await db.save_message(chat_data['id'], 'bot', response)
+        else:
+            for admin_id in ADMIN_IDS:
+                try:
+                    await bot.send_message(
+                        admin_id,
+                        f"💬 *Новое сообщение от пользователя!*\n\n"
+                        f"Пользователь: @{user.username or user.full_name}\n"
+                        f"ID: {user.id}\n"
+                        f"Сообщение: {message.text[:200]}",
+                        parse_mode="Markdown"
+                    )
+                except:
+                    pass
+
+# Регистрируем обработчики при запуске
+register_handlers()
 
 # ==================== API ДЛЯ CRM ====================
 @asynccontextmanager
@@ -514,22 +564,39 @@ async def telegram_webhook(request: Request):
     await dp.feed_webhook_update(bot, telegram_update)
     return {"ok": True}
 
-# Эндпоинт для проверки здоровья
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
-# ==================== CRM API ====================
+# ==================== API ДЛЯ УПРАВЛЕНИЯ БОТАМИ ====================
+@app.get("/api/bots")
+async def get_bots():
+    """Получить список всех ботов"""
+    bots = await db.get_all_bots()
+    return {"bots": bots}
 
+@app.post("/api/bots/switch")
+async def switch_bot(request: Request):
+    """Переключить активного бота"""
+    data = await request.json()
+    bot_id = data.get("bot_id")
+    
+    bot_data = await db.set_active_bot(bot_id)
+    if not bot_data:
+        raise HTTPException(status_code=404, detail="Bot not found")
+    
+    await update_bot_instance(bot_data['bot_token'], bot_data['name'])
+    
+    return {"status": "switched", "bot_name": bot_data['name']}
+
+# ==================== CRM API ====================
 @app.get("/api/chats")
 async def get_chats(limit: int = 50, offset: int = 0, status: str = None):
-    """Получить список чатов"""
     chats = await db.get_all_chats(limit, offset, status)
     return {"chats": chats, "total": len(chats)}
 
 @app.get("/api/chats/{chat_id}")
 async def get_chat(chat_id: int):
-    """Получить информацию о чате"""
     chat = await db.get_chat_by_id(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
@@ -537,13 +604,11 @@ async def get_chat(chat_id: int):
 
 @app.get("/api/chats/{chat_id}/messages")
 async def get_messages(chat_id: int, limit: int = 100):
-    """Получить сообщения чата"""
     messages = await db.get_messages(chat_id, limit)
     return {"messages": messages}
 
 @app.post("/api/chats/{chat_id}/send")
 async def send_message(chat_id: int, request: Request):
-    """Отправить сообщение от оператора"""
     data = await request.json()
     message_text = data.get("message")
     
@@ -563,7 +628,6 @@ async def send_message(chat_id: int, request: Request):
 
 @app.post("/api/chats/{chat_id}/status")
 async def update_status(chat_id: int, request: Request):
-    """Обновить статус диалога"""
     data = await request.json()
     status = data.get("status")
     if not status:
@@ -574,26 +638,22 @@ async def update_status(chat_id: int, request: Request):
 
 @app.post("/api/chats/{chat_id}/toggle-auto")
 async def toggle_auto(chat_id: int):
-    """Переключить режим автообработки"""
     await db.toggle_auto_mode(chat_id)
     return {"status": "toggled"}
 
 @app.post("/api/chats/{chat_id}/mark-read")
 async def mark_read(chat_id: int):
-    """Отметить чат как прочитанный"""
     return {"status": "ok"}
 
 # ==================== UTM СТАТИСТИКА ====================
 @app.get("/api/utm_stats")
 async def get_utm_stats():
-    """Получить статистику по UTM-меткам"""
     stats = await db.get_utm_stats()
     return stats
 
 # ==================== ЭКСПОРТ CSV ====================
 @app.get("/api/export/csv")
 async def export_csv(chat_id: int = None):
-    """Экспорт чатов в CSV"""
     from io import StringIO
     from datetime import datetime
     
@@ -630,7 +690,6 @@ async def export_csv(chat_id: int = None):
 # ==================== ЭКСПОРТ PDF ====================
 @app.get("/api/export/pdf")
 async def export_pdf(chat_id: int = None):
-    """Экспорт чатов в PDF"""
     from datetime import datetime
     from io import BytesIO
     
@@ -675,7 +734,6 @@ async def export_pdf(chat_id: int = None):
 # ==================== ЭКСПОРТ ПО ПЕРИОДУ ====================
 @app.get("/api/export/period")
 async def export_period(from_date: str, to_date: str):
-    """Экспорт чатов за период в CSV"""
     from io import StringIO
     from datetime import datetime
     
@@ -717,6 +775,31 @@ async def export_period(from_date: str, to_date: str):
         headers={"Content-Disposition": f"attachment; filename=chats_{from_date}_{to_date}.csv"}
     )
     return response
+
+# ==================== ШАБЛОНЫ ОТВЕТОВ ====================
+templates_storage = []
+
+@app.get("/api/templates")
+async def get_templates():
+    return {"templates": templates_storage}
+
+@app.post("/api/templates")
+async def create_template(request: Request):
+    data = await request.json()
+    title = data.get("title")
+    text = data.get("text")
+    
+    if not title or not text:
+        raise HTTPException(status_code=400, detail="Title and text are required")
+    
+    template_id = len(templates_storage) + 1
+    templates_storage.append({
+        "id": template_id,
+        "title": title,
+        "text": text,
+        "created_at": datetime.now().isoformat()
+    })
+    return {"id": template_id, "title": title, "text": text}
 
 # ==================== ВЕБ-ДАШБОРД ====================
 @app.get("/dashboard", response_class=HTMLResponse)
