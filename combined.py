@@ -318,6 +318,60 @@ class Database:
             rows = await conn.fetch(query, *params)
             return [dict(r) for r in rows]
 
+    async def search_chats(self, search_query: str = None, status_filter: str = None, limit: int = 100):
+        """Умный поиск чатов по имени, username, ID или тексту сообщения"""
+        async with self.pool.acquire() as conn:
+            active_bot = await self.get_active_bot()
+            bot_id = active_bot['id'] if active_bot else 1
+            
+            query = '''
+                SELECT DISTINCT c.*, u.username, u.full_name, u.utm_source, u.utm_campaign, u.utm_medium, u.utm_term, u.utm_content, u.user_id
+                FROM chats c
+                JOIN users u ON c.user_id = u.user_id
+                LEFT JOIN messages m ON c.id = m.chat_id
+                WHERE c.bot_id = $1 AND c.is_blocked = FALSE
+            '''
+            params = [bot_id]
+            param_counter = 2
+            
+            # Фильтр по статусу
+            if status_filter and status_filter != 'all':
+                query += f' AND c.dialog_status = ${param_counter}'
+                params.append(status_filter)
+                param_counter += 1
+            
+            # Умный поиск
+            if search_query and search_query.strip():
+                search_term = f'%{search_query.strip()}%'
+                query += f''' AND (
+                    u.full_name ILIKE ${param_counter} 
+                    OR u.username ILIKE ${param_counter}
+                    OR CAST(u.user_id AS TEXT) = ${param_counter+1}
+                    OR m.message_text ILIKE ${param_counter}
+                )'''
+                params.append(search_term)
+                params.append(search_query.strip())  # для точного совпадения ID
+                param_counter += 2
+            
+            query += f' ORDER BY c.last_message_at DESC LIMIT ${param_counter}'
+            params.append(limit)
+            
+            rows = await conn.fetch(query, *params)
+            return [dict(r) for r in rows]
+
+    async def get_chat_with_utm(self, chat_id: int):
+        """Получить чат с полными UTM-метками пользователя"""
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow('''
+                SELECT c.*, u.username, u.full_name, u.user_id,
+                       u.utm_source, u.utm_medium, u.utm_campaign, u.utm_term, u.utm_content,
+                       u.referrer, u.start_param, u.gclid
+                FROM chats c
+                JOIN users u ON c.user_id = u.user_id
+                WHERE c.id = $1
+            ''', chat_id)
+            return dict(row) if row else None
+
     async def update_dialog_status(self, chat_id: int, status: str):
         async with self.pool.acquire() as conn:
             await conn.execute('''
@@ -602,9 +656,27 @@ async def get_chats(limit: int = 50, offset: int = 0, status: str = None):
     chats = await db.get_all_chats(limit, offset, status)
     return {"chats": chats, "total": len(chats)}
 
+@app.get("/api/chats/search")
+async def search_chats_endpoint(
+    q: str = Query(None, description="Поисковый запрос"),
+    status: str = Query(None, description="Фильтр по статусу"),
+    limit: int = Query(100, description="Лимит результатов")
+):
+    """Умный поиск чатов"""
+    chats = await db.search_chats(search_query=q, status_filter=status, limit=limit)
+    return {"chats": chats, "total": len(chats)}
+
 @app.get("/api/chats/{chat_id}")
 async def get_chat(chat_id: int):
     chat = await db.get_chat_by_id(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return chat
+
+@app.get("/api/chats/{chat_id}/full")
+async def get_chat_full(chat_id: int):
+    """Получить чат с полными UTM-метками"""
+    chat = await db.get_chat_with_utm(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     return chat
