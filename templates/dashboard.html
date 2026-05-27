@@ -81,44 +81,12 @@
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            flex-wrap: wrap;
-            gap: 10px;
         }
         
         .header-left {
             display: flex;
             align-items: center;
             gap: 20px;
-            flex-wrap: wrap;
-        }
-        
-        .bot-selector {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(255,255,255,0.15);
-            padding: 6px 15px;
-            border-radius: 30px;
-        }
-        
-        .bot-selector label {
-            font-size: 13px;
-            font-weight: 500;
-        }
-        
-        .bot-select {
-            background: rgba(0,0,0,0.2);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 20px;
-            padding: 6px 12px;
-            font-size: 13px;
-            cursor: pointer;
-        }
-        
-        .bot-select option {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
         }
         
         /* ========== МЕНЮ С ТРЕМЯ ТОЧКАМИ ========== */
@@ -152,7 +120,7 @@
             background: var(--menu-bg);
             border-radius: 12px;
             box-shadow: var(--menu-shadow);
-            min-width: 200px;
+            min-width: 220px;
             z-index: 1000;
             display: none;
             overflow: hidden;
@@ -194,6 +162,30 @@
             height: 1px;
             background: var(--border);
             margin: 4px 0;
+        }
+        
+        /* Стили для выбора бота внутри меню */
+        .bot-select-inline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+        
+        .bot-select-inline label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        .bot-select-inline select {
+            flex: 1;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
         }
         
         .tabs {
@@ -897,23 +889,26 @@
     </style>
 </head>
 <body>
-    <button class="show-sidebar-btn" id="showSidebarBtn" title="Показать панель частов">▶</button>
+    <button class="show-sidebar-btn" id="showSidebarBtn" title="Показать панель чатов">▶</button>
     
     <div class="header">
         <div class="header-left">
             <h1>🤖 RobotChoiceBot CRM</h1>
-            <div class="bot-selector">
-                <label>🤖 Бот:</label>
-                <select id="botSelector" class="bot-select">
-                    <option value="">Загрузка...</option>
-                </select>
-            </div>
         </div>
         <div class="menu-container">
             <button class="menu-btn" id="menuBtn">
                 <span>⋮</span>
             </button>
             <div class="menu-dropdown" id="menuDropdown">
+                <div class="menu-item" id="botMenuItem">
+                    <div class="bot-select-inline">
+                        <label>🤖 Бот:</label>
+                        <select id="botSelector" class="bot-select">
+                            <option value="">Загрузка...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="menu-divider"></div>
                 <div class="menu-item" id="themeMenuItem">
                     <span class="icon" id="menuThemeIcon">🌙</span>
                     <span id="menuThemeText">Тёмная тема</span>
