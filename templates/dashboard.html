@@ -1771,7 +1771,6 @@ async function showUtmHistory() {
                 minute: '2-digit'
             });
             
-            // Экранируем значения и заменяем пустые строки на "-"
             const source = session.utm_source && session.utm_source.trim() !== '' ? escapeHtml(session.utm_source) : '-';
             const medium = session.utm_medium && session.utm_medium.trim() !== '' ? escapeHtml(session.utm_medium) : '-';
             const campaign = session.utm_campaign && session.utm_campaign.trim() !== '' ? escapeHtml(session.utm_campaign) : '-';
