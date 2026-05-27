@@ -43,15 +43,14 @@ storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
-import json
-
 def parse_utm_from_start_param(start_param: str) -> dict:
+    """Парсит UTM-метки из параметра start (формат: id__source__medium__campaign__term__content)"""
     if not start_param:
         return {}
     
     utm_data = {}
     
-    # Формат: id__source__medium__campaign
+    # Формат: id__source__medium__campaign__term__content
     if '__' in start_param:
         parts = start_param.split('__')
         utm_data['start_param'] = parts[0] if len(parts) > 0 else ''
@@ -234,62 +233,62 @@ class Database:
             return [dict(r) for r in rows]
 
     async def get_or_create_chat(self, user_id: int, username: str = None, 
-                              full_name: str = None, start_param: str = None):
-    async with self.pool.acquire() as conn:
-        active_bot = await self.get_active_bot()
-        bot_id = active_bot['id'] if active_bot else 1
-        
-        # Парсим UTM из start_param
-        utm_data = parse_utm_from_start_param(start_param)
-        logger.info(f"📊 Parsed UTM for user {user_id}: {utm_data}")
-        
-        # Сохраняем или обновляем пользователя с UTM-метками
-        await conn.execute('''
-            INSERT INTO users (user_id, username, full_name, bot_id,
-                               utm_source, utm_medium, utm_campaign, 
-                               utm_content, utm_term, referrer, start_param, gclid)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            ON CONFLICT (user_id) DO UPDATE
-            SET username = EXCLUDED.username, 
-                full_name = EXCLUDED.full_name,
-                last_active = NOW()
-        ''', user_id, username, full_name, bot_id,
-           utm_data.get('utm_source'),
-           utm_data.get('utm_medium'),
-           utm_data.get('utm_campaign'),
-           utm_data.get('utm_content'),
-           utm_data.get('utm_term'),
-           utm_data.get('referrer'),
-           utm_data.get('start_param', start_param),
-           utm_data.get('gclid'))
-        
-        # Сохраняем сессию с UTM
-        await conn.execute('''
-            INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
-                                       utm_campaign, utm_content, utm_term, 
-                                       referrer, start_param, gclid)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        ''', user_id, bot_id,
-           utm_data.get('utm_source'),
-           utm_data.get('utm_medium'),
-           utm_data.get('utm_campaign'),
-           utm_data.get('utm_content'),
-           utm_data.get('utm_term'),
-           utm_data.get('referrer'),
-           utm_data.get('start_param', start_param),
-           utm_data.get('gclid'))
-        
-        # Получаем или создаём чат
-        row = await conn.fetchrow('SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2', user_id, bot_id)
-        if row:
-            return dict(row)
-        else:
-            row = await conn.fetchrow('''
-                INSERT INTO chats (user_id, bot_id)
-                VALUES ($1, $2)
-                RETURNING *
-            ''', user_id, bot_id)
-            return dict(row)
+                                  full_name: str = None, start_param: str = None):
+        async with self.pool.acquire() as conn:
+            active_bot = await self.get_active_bot()
+            bot_id = active_bot['id'] if active_bot else 1
+            
+            # Парсим UTM из start_param
+            utm_data = parse_utm_from_start_param(start_param)
+            logger.info(f"📊 Parsed UTM for user {user_id}: {utm_data}")
+            
+            # Сохраняем или обновляем пользователя с UTM-метками
+            await conn.execute('''
+                INSERT INTO users (user_id, username, full_name, bot_id,
+                                   utm_source, utm_medium, utm_campaign, 
+                                   utm_content, utm_term, referrer, start_param, gclid)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                ON CONFLICT (user_id) DO UPDATE
+                SET username = EXCLUDED.username, 
+                    full_name = EXCLUDED.full_name,
+                    last_active = NOW()
+            ''', user_id, username, full_name, bot_id,
+               utm_data.get('utm_source'),
+               utm_data.get('utm_medium'),
+               utm_data.get('utm_campaign'),
+               utm_data.get('utm_content'),
+               utm_data.get('utm_term'),
+               utm_data.get('referrer'),
+               utm_data.get('start_param', start_param),
+               utm_data.get('gclid'))
+            
+            # Сохраняем сессию с UTM
+            await conn.execute('''
+                INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
+                                           utm_campaign, utm_content, utm_term, 
+                                           referrer, start_param, gclid)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ''', user_id, bot_id,
+               utm_data.get('utm_source'),
+               utm_data.get('utm_medium'),
+               utm_data.get('utm_campaign'),
+               utm_data.get('utm_content'),
+               utm_data.get('utm_term'),
+               utm_data.get('referrer'),
+               utm_data.get('start_param', start_param),
+               utm_data.get('gclid'))
+            
+            # Получаем или создаём чат
+            row = await conn.fetchrow('SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2', user_id, bot_id)
+            if row:
+                return dict(row)
+            else:
+                row = await conn.fetchrow('''
+                    INSERT INTO chats (user_id, bot_id)
+                    VALUES ($1, $2)
+                    RETURNING *
+                ''', user_id, bot_id)
+                return dict(row)
 
     async def save_message(self, chat_id: int, sender_type: str, message_text: str = None, file_id: str = None):
         async with self.pool.acquire() as conn:
