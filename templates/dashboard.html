@@ -92,7 +92,45 @@
             transition: background 0.3s ease, color 0.2s ease;
         }
         
-        /* ========== УЛУЧШЕННЫЕ СООБЩЕНИЯ С ОБВОДКАМИ ========== */
+        /* ========== ПОДСКАЗКИ ПРИ НАВЕДЕНИИ ========== */
+        [title] {
+            cursor: help;
+            position: relative;
+        }
+        
+        [data-tooltip] {
+            position: relative;
+            cursor: help;
+        }
+        
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: fixed;
+            background: var(--tooltip-bg);
+            color: var(--tooltip-text);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            pointer-events: none;
+            margin-top: 28px;
+            margin-left: -10px;
+        }
+        
+        [data-tooltip]:hover::before {
+            content: '';
+            position: fixed;
+            border: 6px solid transparent;
+            border-bottom-color: var(--tooltip-bg);
+            z-index: 10000;
+            pointer-events: none;
+            margin-top: 16px;
+            margin-left: 5px;
+        }
+        
+        /* ========== УЛУЧШЕННЫЕ СООБЩЕНИЯ ========== */
         .message {
             max-width: 65%;
             padding: 10px 14px;
@@ -103,7 +141,6 @@
             transition: all 0.2s ease;
         }
         
-        /* Сообщения пользователя (слева, светлые) */
         .message.user {
             align-self: flex-start;
             background: var(--message-user);
@@ -113,7 +150,6 @@
             border-radius: 16px 16px 16px 4px;
         }
         
-        /* Сообщения бота (справа, цветные) */
         .message.bot {
             align-self: flex-end;
             background: var(--message-bot);
@@ -121,7 +157,6 @@
             border-radius: 16px 16px 4px 16px;
         }
         
-        /* Сообщения оператора (справа, зелёные) */
         .message.operator {
             align-self: flex-end;
             background: var(--message-operator);
@@ -129,12 +164,6 @@
             border-radius: 16px 16px 4px 16px;
         }
         
-        /* Обводка для разных типов */
-        .message.user {
-            border-left: 4px solid var(--status-new);
-        }
-        
-        /* Статус "прочитано" */
         .message .read-status {
             font-size: 9px;
             margin-left: 6px;
@@ -176,7 +205,6 @@
             font-weight: 500;
         }
         
-        /* Анимация новых сообщений */
         @keyframes fadeSlideUp {
             from {
                 opacity: 0;
@@ -192,41 +220,6 @@
             animation: fadeSlideUp 0.3s ease;
         }
         
-        /* ========== ВЫБОР АКЦЕНТНОГО ЦВЕТА ========== */
-        .accent-selector {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid var(--border);
-        }
-        
-        .accent-option {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: transform 0.2s, border 0.2s;
-            border: 2px solid transparent;
-        }
-        
-        .accent-option:hover {
-            transform: scale(1.1);
-        }
-        
-        .accent-option.active {
-            border-color: var(--text-primary);
-            transform: scale(1.1);
-        }
-        
-        .accent-option.blue { background: #0066ff; }
-        .accent-option.green { background: #00cc66; }
-        .accent-option.neon { background: #00f0ff; }
-        
-        /* ... остальные существующие стили остаются без изменений ... */
-        
-        /* ========== ОСТАЛЬНЫЕ СТИЛИ (сохраняем существующие) ========== */
         .header {
             background: var(--accent);
             color: white;
@@ -329,6 +322,41 @@
             background: var(--border);
             margin: 4px 0;
         }
+        
+        .accent-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 14px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .accent-selector span {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        
+        .accent-option {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s, border 0.2s;
+            border: 2px solid transparent;
+        }
+        
+        .accent-option:hover {
+            transform: scale(1.1);
+        }
+        
+        .accent-option.active {
+            border-color: var(--text-primary);
+            transform: scale(1.1);
+        }
+        
+        .accent-option.blue { background: #0066ff; }
+        .accent-option.green { background: #00cc66; }
+        .accent-option.neon { background: #00f0ff; }
         
         .bot-select-inline {
             display: flex;
@@ -1122,7 +1150,7 @@
             </h1>
         </div>
         <div class="menu-container">
-            <button class="menu-btn" id="menuBtn">
+            <button class="menu-btn" id="menuBtn" title="Меню">
                 <span>⋮</span>
             </button>
             <div class="menu-dropdown" id="menuDropdown">
@@ -1139,8 +1167,8 @@
                     <span class="icon" id="menuThemeIcon">🌙</span>
                     <span id="menuThemeText">Тёмная тема</span>
                 </div>
-                <div class="accent-selector" id="accentSelector">
-                    <span style="font-size: 11px;">🎨 Акцент:</span>
+                <div class="accent-selector">
+                    <span>🎨 Акцент:</span>
                     <div class="accent-option blue" data-accent="blue" title="Синий"></div>
                     <div class="accent-option green" data-accent="green" title="Зелёный"></div>
                     <div class="accent-option neon" data-accent="neon" title="Неоновый"></div>
@@ -1166,7 +1194,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <span>📋 Чаты</span>
                         <div style="display: flex; gap: 6px;">
-                            <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу">
+                            <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу (показать/скрыть панель)">
                                 <span>🔍</span>
                                 <span>Фильтр</span>
                                 <span id="filterBadge" class="filter-badge" style="display: none;"></span>
@@ -1186,13 +1214,13 @@
                     <div class="filter-row">
                         <span class="filter-label">📌 Статус:</span>
                         <div class="status-filter" id="statusFilter">
-                            <button class="status-filter-btn active" data-status="all">Все</button>
-                            <button class="status-filter-btn" data-status="первое сообщение">🆕 Первое</button>
-                            <button class="status-filter-btn" data-status="ожидание менеджера">📞 Ожидание</button>
-                            <button class="status-filter-btn" data-status="в работе">⚙️ В работе</button>
-                            <button class="status-filter-btn" data-status="закрыт">✅ Закрыт</button>
+                            <button class="status-filter-btn active" data-status="all" title="Показать все чаты без фильтрации">Все</button>
+                            <button class="status-filter-btn" data-status="первое сообщение" title="Клиент только написал первое сообщение">🆕 Первое</button>
+                            <button class="status-filter-btn" data-status="ожидание менеджера" title="Клиент ожидает ответа от менеджера">📞 Ожидание</button>
+                            <button class="status-filter-btn" data-status="в работе" title="Менеджер взял чат в работу">⚙️ В работе</button>
+                            <button class="status-filter-btn" data-status="закрыт" title="Диалог завершён">✅ Закрыт</button>
                         </div>
-                        <span class="filter-clear" id="clearFilterBtn">✕ сбросить</span>
+                        <span class="filter-clear" id="clearFilterBtn" title="Сбросить все фильтры">✕ сбросить</span>
                     </div>
                 </div>
                 
@@ -1206,31 +1234,31 @@
                     <div class="toolbar-full" id="toolbarFull">
                         <div><strong id="chatName" class="selected-chat-name"></strong></div>
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <select id="statusSelect" class="status-select">
+                            <select id="statusSelect" class="status-select" title="Изменить статус диалога">
                                 <option value="первое сообщение">первое сообщение</option>
                                 <option value="ожидание менеджера">ожидание менеджера</option>
                                 <option value="в работе">в работе</option>
                                 <option value="закрыт">закрыт</option>
                             </select>
-                            <button id="toggleAutoBtn" class="toggle-auto-btn">Авторежим ВКЛ</button>
-                            <button id="templatesBtn" class="templates-btn">📋 Шаблоны</button>
+                            <button id="toggleAutoBtn" class="toggle-auto-btn" title="Включить/выключить автоответы бота">Авторежим ВКЛ</button>
+                            <button id="templatesBtn" class="templates-btn" title="Использовать готовые шаблоны ответов">📋 Шаблоны</button>
                             <div class="export-buttons">
-                                <input type="date" id="exportDateFrom" class="date-input">
-                                <input type="date" id="exportDateTo" class="date-input">
-                                <button id="exportPeriodBtn" class="export-link">📊 Экспорт</button>
-                                <a href="/api/export/csv" class="export-link">📥 CSV</a>
-                                <a href="/api/export/pdf" class="export-link">📄 PDF</a>
+                                <input type="date" id="exportDateFrom" class="date-input" title="Начало периода для экспорта">
+                                <input type="date" id="exportDateTo" class="date-input" title="Конец периода для экспорта">
+                                <button id="exportPeriodBtn" class="export-link" title="Экспортировать чаты за выбранный период">📊 Экспорт</button>
+                                <a href="/api/export/csv" class="export-link" title="Экспорт всех чатов в CSV">📥 CSV</a>
+                                <a href="/api/export/pdf" class="export-link" title="Экспорт всех чатов в PDF">📄 PDF</a>
                             </div>
                         </div>
                     </div>
                     <div class="toolbar-compact" id="toolbarCompact">
                         <div><strong id="chatNameCompact" class="selected-chat-name"></strong></div>
                         <div class="compact-status" id="compactStatus">Статус</div>
-                        <button class="compact-btn" id="compactAutoBtn">🤖</button>
-                        <button class="compact-btn" id="compactTemplatesBtn">📋</button>
-                        <button class="compact-btn" id="compactExportBtn">📊</button>
-                        <a href="/api/export/csv" class="compact-btn">📥</a>
-                        <a href="/api/export/pdf" class="compact-btn">📄</a>
+                        <button class="compact-btn" id="compactAutoBtn" title="Включить/выключить автоответы бота">🤖</button>
+                        <button class="compact-btn" id="compactTemplatesBtn" title="Использовать готовые шаблоны ответов">📋</button>
+                        <button class="compact-btn" id="compactExportBtn" title="Экспортировать чаты за выбранный период">📊</button>
+                        <a href="/api/export/csv" class="compact-btn" title="Экспорт всех чатов в CSV">📥</a>
+                        <a href="/api/export/pdf" class="compact-btn" title="Экспорт всех чатов в PDF">📄</a>
                     </div>
                     
                     <!-- UTM-МЕТКИ ТЕКУЩЕГО КЛИЕНТА -->
@@ -1241,7 +1269,7 @@
                                 <strong>UTM-метки клиента</strong>
                                 <span style="font-size: 9px; color: var(--text-muted);">(первые касания)</span>
                             </div>
-                            <button id="showUtmHistoryBtn" class="compact-btn" style="padding: 3px 8px; font-size: 10px;">
+                            <button id="showUtmHistoryBtn" class="compact-btn" style="padding: 3px 8px; font-size: 10px;" title="Показать историю всех UTM-меток клиента">
                                 📜 История
                             </button>
                         </div>
@@ -1253,7 +1281,7 @@
                 <div class="messages-container" id="messagesContainer"></div>
                 <div class="message-input-container">
                     <textarea class="message-input" id="messageInput" placeholder="Написать сообщение..." rows="1"></textarea>
-                    <button class="send-button" id="sendBtn">➤</button>
+                    <button class="send-button" id="sendBtn" title="Отправить сообщение (Enter)">➤</button>
                 </div>
             </div>
         </div>
@@ -1353,7 +1381,6 @@
                 themeText.textContent = 'Тёмная тема';
             }
             
-            // Применяем акцентный цвет
             document.body.classList.add(`accent-${savedAccent}`);
             const accentOptions = document.querySelectorAll('.accent-option');
             accentOptions.forEach(opt => {
@@ -1713,7 +1740,6 @@
                     const statusDisplay = getStatusDisplayName(chat.dialog_status);
                     let displayName = escapeHtml(chat.full_name || chat.username || 'User');
                     
-                    // Подсветка найденных фрагментов в имени
                     if (currentSearchQuery && currentSearchQuery.trim()) {
                         const regex = new RegExp(`(${escapeRegex(currentSearchQuery)})`, 'gi');
                         displayName = displayName.replace(regex, '<mark>$1</mark>');
@@ -1912,7 +1938,6 @@
                 return;
             }
             
-            // Сохраняем последний ID сообщения для отслеживания новых
             if (data.messages.length > 0) {
                 lastMessageId = data.messages[data.messages.length - 1].id;
             }
