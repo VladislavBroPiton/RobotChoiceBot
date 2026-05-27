@@ -1217,14 +1217,15 @@
         async function exportPeriod() {
             const dateFrom = document.getElementById('exportDateFrom').value;
             const dateTo = document.getElementById('exportDateTo').value;
-            
+    
             if (!dateFrom || !dateTo) {
                 alert('Выберите период (с и по дату)');
                 return;
-            }
-            
-            window.open(`/api/export/period?from=${dateFrom}&to=${dateTo}`, '_blank');
         }
+    
+    // Исправлено: from_date и to_date (как ожидает бэкенд)
+    window.open(`/api/export/period?from_date=${dateFrom}&to_date=${dateTo}`, '_blank');
+}
         
         // ========== КОМПАКТНЫЕ КНОПКИ ==========
         document.getElementById('compactAutoBtn')?.addEventListener('click', () => {
@@ -1238,7 +1239,8 @@
                 alert('Выберите период (с и по дату)');
                 return;
             }
-            window.open(`/api/export/period?from=${dateFrom}&to=${dateTo}`, '_blank');
+            // Исправлено: from_date и to_date
+            window.open(`/api/export/period?from_date=${dateFrom}&to_date=${dateTo}`, '_blank');
         });
         
         // ========== ОБРАБОТЧИКИ ==========
