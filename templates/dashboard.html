@@ -7,7 +7,6 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        /* ========== СВЕТЛАЯ ТЕМА (по умолчанию) ========== */
         :root {
             --bg-primary: #f0f2f5;
             --bg-secondary: #ffffff;
@@ -34,7 +33,6 @@
             --status-closed: #95a5a6;
         }
         
-        /* ========== ТЁМНАЯ ТЕМА ========== */
         body.dark {
             --bg-primary: #1a1a2e;
             --bg-secondary: #16213e;
@@ -72,11 +70,55 @@
         .header {
             background: var(--accent);
             color: white;
-            padding: 16px 24px;
+            padding: 12px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .bot-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.15);
+            padding: 6px 15px;
+            border-radius: 30px;
+        }
+        
+        .bot-selector label {
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .bot-select {
+            background: rgba(0,0,0,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        
+        .bot-select option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+        
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
         
         .theme-toggle-btn {
@@ -143,7 +185,6 @@
             height: calc(100vh - 110px);
         }
         
-        /* Панель чатов (сайдбар) с анимацией */
         .chats-sidebar {
             width: 350px;
             min-width: 350px;
@@ -172,12 +213,6 @@
             justify-content: space-between;
             align-items: center;
             background: var(--bg-sidebar);
-        }
-        
-        .chats-header-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
         
         .filter-btn {
@@ -212,21 +247,12 @@
             padding: 6px 10px;
             cursor: pointer;
             font-size: 14px;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
             transition: all 0.2s;
         }
         
         .collapse-btn:hover {
             background: var(--accent-light);
             border-color: var(--accent);
-        }
-        
-        .collapse-icon {
-            font-size: 14px;
-            transition: transform 0.3s ease;
         }
         
         .filter-panel {
@@ -242,24 +268,10 @@
             display: flex;
         }
         
-        .filter-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        
-        .filter-label {
-            font-size: 12px;
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-        
         .status-filter {
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
-            flex: 1;
         }
         
         .status-filter-btn {
@@ -307,10 +319,6 @@
             cursor: pointer;
             padding: 4px 8px;
             border-radius: 4px;
-        }
-        
-        .filter-clear:hover {
-            background: var(--accent-light);
         }
         
         .filter-badge {
@@ -363,8 +371,6 @@
         .status-badge.working { background: var(--status-working); color: white; }
         .status-badge.closed { background: var(--status-closed); color: white; }
         
-        .chat-status { font-size: 12px; color: var(--text-secondary); }
-        
         .utm-badge {
             font-size: 10px;
             color: var(--accent);
@@ -415,12 +421,12 @@
             padding: 6px 10px;
             cursor: pointer;
             font-size: 12px;
+            transition: all 0.2s;
+            text-decoration: none;
             color: var(--text-primary);
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            transition: all 0.2s;
-            text-decoration: none;
         }
         
         .compact-btn:hover {
@@ -506,11 +512,6 @@
             color: var(--text-primary);
         }
         
-        .message-input:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-        
         .send-button {
             background: var(--accent);
             color: white;
@@ -523,10 +524,6 @@
             transition: background 0.2s;
         }
         
-        .send-button:hover {
-            background: var(--accent-hover);
-        }
-        
         .status-select {
             padding: 6px 12px;
             border-radius: 6px;
@@ -535,7 +532,7 @@
             color: var(--text-primary);
         }
         
-        .toggle-auto-btn, .templates-btn {
+        .toggle-auto-btn {
             background: var(--accent);
             color: white;
             border: none;
@@ -545,15 +542,23 @@
             transition: background 0.2s;
         }
         
-        .toggle-auto-btn.off { background: var(--toggle-off); }
+        .toggle-auto-btn.off {
+            background: var(--toggle-off);
+        }
         
         .templates-btn {
             background: var(--button-secondary);
             color: var(--text-primary);
             border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
         }
         
-        .templates-btn:hover { background: var(--accent-light); }
+        .templates-btn:hover {
+            background: var(--accent-light);
+        }
         
         .empty-state {
             text-align: center;
@@ -583,11 +588,6 @@
             transition: all 0.2s;
         }
         
-        .export-link:hover {
-            background: var(--accent-light);
-            border-color: var(--accent);
-        }
-        
         .date-input {
             padding: 6px 10px;
             border-radius: 6px;
@@ -597,7 +597,6 @@
             font-size: 13px;
         }
         
-        /* ========== UTM СТАТИСТИКА ========== */
         .stats-container {
             flex: 1;
             overflow-y: auto;
@@ -612,13 +611,11 @@
             border-radius: 16px;
             border: 1px solid var(--border);
             padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
         
         .stats-card h3 {
             font-size: 16px;
             font-weight: 600;
-            color: var(--text-primary);
             margin-bottom: 16px;
             padding-bottom: 12px;
             border-bottom: 1px solid var(--border);
@@ -640,7 +637,6 @@
         
         .stats-name {
             font-size: 14px;
-            color: var(--text-primary);
         }
         
         .stats-count {
@@ -676,7 +672,6 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
         }
         
         .modal-header {
@@ -686,7 +681,6 @@
             justify-content: space-between;
             align-items: center;
             font-weight: 600;
-            color: var(--text-primary);
         }
         
         .modal-close {
@@ -718,7 +712,6 @@
         
         .template-title {
             font-weight: 600;
-            color: var(--text-primary);
             margin-bottom: 4px;
         }
         
@@ -776,9 +769,24 @@
             pointer-events: auto;
         }
         
-        .show-sidebar-btn:hover {
-            background: var(--accent-hover);
-            padding-right: 12px;
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            z-index: 2000;
+            font-size: 14px;
+            animation: fadeOut 3s forwards;
+        }
+        
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
         }
     </style>
 </head>
@@ -786,8 +794,16 @@
     <button class="show-sidebar-btn" id="showSidebarBtn" title="Показать панель чатов">▶</button>
     
     <div class="header">
-        <h1>🤖 RobotChoiceBot CRM</h1>
-        <div style="display: flex; gap: 16px; align-items: center;">
+        <div class="header-left">
+            <h1>🤖 RobotChoiceBot CRM</h1>
+            <div class="bot-selector">
+                <label>🤖 Бот:</label>
+                <select id="botSelector" class="bot-select">
+                    <option value="">Загрузка...</option>
+                </select>
+            </div>
+        </div>
+        <div class="header-right">
             <button class="theme-toggle-btn" id="themeToggleBtn">
                 <span id="themeIcon">🌙</span>
                 <span id="themeText">Тёмная тема</span>
@@ -805,10 +821,8 @@
         <div class="main-content">
             <div class="chats-sidebar" id="chatsSidebar">
                 <div class="chats-header" id="chatsHeader">
-                    <div class="chats-header-title">
-                        <span>📋 Чаты</span>
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
+                    <span>📋 Чаты</span>
+                    <div style="display: flex; gap: 8px;">
                         <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу">
                             <span>🔍</span>
                             <span>Фильтр</span>
@@ -821,14 +835,14 @@
                 </div>
                 
                 <div class="filter-panel" id="filterPanel">
-                    <div class="filter-row">
+                    <div class="filter-row" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                         <span class="filter-label">📌 Статус:</span>
                         <div class="status-filter" id="statusFilter">
-                            <button class="status-filter-btn active" data-status="all" data-tooltip="Показать все чаты без фильтрации">Все</button>
-                            <button class="status-filter-btn" data-status="первое сообщение" data-tooltip="Клиент только написал первое сообщение">🆕 Первое</button>
-                            <button class="status-filter-btn" data-status="ожидание менеджера" data-tooltip="Клиент ожидает ответа от менеджера">📞 Ожидание</button>
-                            <button class="status-filter-btn" data-status="в работе" data-tooltip="Менеджер взял чат в работу">⚙️ В работе</button>
-                            <button class="status-filter-btn" data-status="закрыт" data-tooltip="Диалог завершён">✅ Закрыт</button>
+                            <button class="status-filter-btn active" data-status="all" data-tooltip="Показать все чаты">Все</button>
+                            <button class="status-filter-btn" data-status="первое сообщение" data-tooltip="Первое сообщение">🆕 Первое</button>
+                            <button class="status-filter-btn" data-status="ожидание менеджера" data-tooltip="Ожидает менеджера">📞 Ожидание</button>
+                            <button class="status-filter-btn" data-status="в работе" data-tooltip="В работе">⚙️ В работе</button>
+                            <button class="status-filter-btn" data-status="закрыт" data-tooltip="Закрыт">✅ Закрыт</button>
                         </div>
                         <span class="filter-clear" id="clearFilterBtn">✕ сбросить</span>
                     </div>
@@ -965,6 +979,59 @@
         let filterPanelVisible = false;
         let sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
         
+        // ========== ЗАГРУЗКА БОТОВ ==========
+        async function loadBots() {
+            try {
+                const res = await fetch('/api/bots');
+                const data = await res.json();
+                const selector = document.getElementById('botSelector');
+                
+                if (data.bots && data.bots.length) {
+                    selector.innerHTML = data.bots.map(bot => 
+                        `<option value="${bot.id}" ${bot.is_active ? 'selected' : ''}>${bot.name}</option>`
+                    ).join('');
+                } else {
+                    selector.innerHTML = '<option value="">Нет ботов</option>';
+                }
+            } catch(e) {
+                console.error('Error loading bots:', e);
+            }
+        }
+        
+        async function switchBot(botId) {
+            try {
+                const res = await fetch('/api/bots/switch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bot_id: parseInt(botId) })
+                });
+                
+                if (res.ok) {
+                    currentChatId = null;
+                    document.getElementById('messagesArea').style.display = 'none';
+                    await loadChats();
+                    showToast('✅ Бот переключён');
+                }
+            } catch(e) {
+                console.error('Error switching bot:', e);
+                showToast('❌ Ошибка переключения бота');
+            }
+        }
+        
+        function showToast(message) {
+            let toast = document.querySelector('.toast');
+            if (toast) toast.remove();
+            toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        document.getElementById('botSelector')?.addEventListener('change', (e) => {
+            if (e.target.value) switchBot(e.target.value);
+        });
+        
         // ========== ВКЛАДКИ ==========
         function switchTab(tabId) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -988,7 +1055,6 @@
                 const res = await fetch('/api/utm_stats');
                 const data = await res.json();
                 
-                // Источники
                 const sourcesContainer = document.getElementById('utmSourcesList');
                 if (data.sources && data.sources.length) {
                     sourcesContainer.innerHTML = data.sources.map(s => `
@@ -1001,7 +1067,6 @@
                     sourcesContainer.innerHTML = '<div class="empty-state">Нет данных</div>';
                 }
                 
-                // Кампании
                 const campaignsContainer = document.getElementById('utmCampaignsList');
                 if (data.campaigns && data.campaigns.length) {
                     campaignsContainer.innerHTML = data.campaigns.map(c => `
@@ -1014,7 +1079,6 @@
                     campaignsContainer.innerHTML = '<div class="empty-state">Нет данных</div>';
                 }
                 
-                // Конверсии
                 const conversionsContainer = document.getElementById('utmConversionsList');
                 if (data.conversions && data.conversions.length) {
                     conversionsContainer.innerHTML = data.conversions.map(c => `
@@ -1031,7 +1095,7 @@
             }
         }
         
-        // ========== СВОРАЧИВАНИЕ ПАНЕЛИ ЧАТОВ ==========
+        // ========== СВОРАЧИВАНИЕ ПАНЕЛИ ==========
         function toggleSidebar() {
             const sidebar = document.getElementById('chatsSidebar');
             const showBtn = document.getElementById('showSidebarBtn');
@@ -1054,12 +1118,10 @@
             }
         }
         
-        function showSidebar() {
-            if (sidebarCollapsed) toggleSidebar();
-        }
-        
         document.getElementById('collapseBtn')?.addEventListener('click', toggleSidebar);
-        document.getElementById('showSidebarBtn')?.addEventListener('click', showSidebar);
+        document.getElementById('showSidebarBtn')?.addEventListener('click', () => {
+            if (sidebarCollapsed) toggleSidebar();
+        });
         
         function initSidebarState() {
             const sidebar = document.getElementById('chatsSidebar');
@@ -1080,7 +1142,7 @@
             }
         }
         
-        // ========== ПАНЕЛЬ ФИЛЬТРАЦИИ ==========
+        // ========== ФИЛЬТРЫ ==========
         function toggleFilterPanel() {
             filterPanelVisible = !filterPanelVisible;
             const panel = document.getElementById('filterPanel');
@@ -1128,7 +1190,6 @@
         document.getElementById('filterToggleBtn')?.addEventListener('click', toggleFilterPanel);
         document.getElementById('clearFilterBtn')?.addEventListener('click', clearFilters);
         
-        // ========== ФИЛЬТРАЦИЯ ЧАТОВ ==========
         function initStatusFilter() {
             const filterBtns = document.querySelectorAll('.status-filter-btn');
             filterBtns.forEach(btn => {
@@ -1224,7 +1285,6 @@
             autoBtn.textContent = currentAutoMode ? 'Авторежим ВКЛ' : 'Авторежим ВЫКЛ';
             autoBtn.className = currentAutoMode ? 'toggle-auto-btn' : 'toggle-auto-btn off';
             compactAutoBtn.style.opacity = currentAutoMode ? '1' : '0.5';
-            compactAutoBtn.style.filter = currentAutoMode ? 'none' : 'grayscale(0.5)';
             
             document.getElementById('messagesArea').style.display = 'flex';
             await loadMessages(chatId);
@@ -1306,7 +1366,6 @@
                 autoBtn.textContent = currentAutoMode ? 'Авторежим ВКЛ' : 'Авторежим ВЫКЛ';
                 autoBtn.className = currentAutoMode ? 'toggle-auto-btn' : 'toggle-auto-btn off';
                 compactAutoBtn.style.opacity = currentAutoMode ? '1' : '0.5';
-                compactAutoBtn.style.filter = currentAutoMode ? 'none' : 'grayscale(0.5)';
             }
         }
         
@@ -1420,6 +1479,7 @@
         
         initStatusFilter();
         initSidebarState();
+        loadBots();
         loadChats();
         setInterval(() => {
             loadChats();
