@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import logging
+import signal
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
@@ -503,6 +504,13 @@ db = Database()
 
 async def update_bot_instance(new_token: str, new_name: str):
     global bot, dp, current_bot_token, current_bot_name
+    # Закрываем старого бота если он существует
+    if bot and not bot.session.closed:
+        try:
+            await bot.delete_webhook()
+            await bot.session.close()
+        except:
+            pass
     current_bot_token = new_token
     current_bot_name = new_name
     bot = Bot(token=current_bot_token)
@@ -674,9 +682,27 @@ register_handlers()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.connect()
+    logger.info("✅ База данных подключена")
+    
+    # Устанавливаем вебхук при старте
+    if bot:
+        webhook_url = f"https://robotchoicebot.onrender.com/webhook"
+        await bot.set_webhook(webhook_url)
+        logger.info(f"✅ Вебхук установлен: {webhook_url}")
+    
     yield
+    
+    # Graceful shutdown
+    logger.info("🔄 Shutting down...")
+    if bot:
+        try:
+            await bot.delete_webhook()
+            await bot.session.close()
+        except:
+            pass
     if db.pool:
         await db.pool.close()
+    logger.info("✅ Shutdown complete")
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
@@ -688,6 +714,11 @@ app.add_middleware(
 )
 
 templates = Jinja2Templates(directory="templates")
+
+# Корневой маршрут - перенаправление на дашборд
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/dashboard")
 
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
