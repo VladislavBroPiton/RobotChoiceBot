@@ -306,9 +306,6 @@
             border-bottom: 1px solid var(--border);
             font-weight: 600;
             color: var(--text-primary);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             background: var(--bg-sidebar);
             font-size: 14px;
         }
@@ -482,6 +479,13 @@
             border-radius: 10px;
         }
         
+        mark {
+            background: var(--accent);
+            color: white;
+            padding: 0 2px;
+            border-radius: 3px;
+        }
+        
         .messages-area {
             flex: 1;
             display: flex;
@@ -614,6 +618,11 @@
             color: var(--text-primary);
         }
         
+        .message-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
         .send-button {
             background: var(--accent);
             color: white;
@@ -625,6 +634,10 @@
             font-size: 18px;
             transition: background 0.2s;
             position: relative;
+        }
+        
+        .send-button:hover {
+            background: var(--accent-hover);
         }
         
         .status-select {
@@ -865,6 +878,10 @@
             font-size: 13px;
         }
         
+        .add-template-btn:hover {
+            background: var(--accent-hover);
+        }
+        
         .show-sidebar-btn {
             position: fixed;
             left: 0;
@@ -906,6 +923,60 @@
             0% { opacity: 1; }
             70% { opacity: 1; }
             100% { opacity: 0; visibility: hidden; }
+        }
+        
+        #searchChatsInput {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 12px;
+            outline: none;
+            transition: all 0.2s;
+        }
+        
+        #searchChatsInput:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-light);
+        }
+        
+        #searchChatsInput::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .utm-info-block {
+            margin-top: 10px;
+            padding: 10px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-size: 11px;
+        }
+        
+        .utm-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+        
+        .utm-field {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .utm-label {
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+        
+        .utm-value {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--accent);
+            word-break: break-all;
         }
     </style>
 </head>
@@ -955,17 +1026,24 @@
         <div class="main-content">
             <div class="chats-sidebar" id="chatsSidebar">
                 <div class="chats-header" id="chatsHeader">
-                    <span>📋 Чаты</span>
-                    <div style="display: flex; gap: 6px;">
-                        <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу" data-tooltip="Фильтровать чаты по статусу диалога">
-                            <span>🔍</span>
-                            <span>Фильтр</span>
-                            <span id="filterBadge" class="filter-badge" style="display: none;"></span>
-                        </button>
-                        <button class="collapse-btn" id="collapseBtn" title="Свернуть панель" data-tooltip="Скрыть панель чатов для экономии места">
-                            <span class="collapse-icon" id="collapseIcon">◀</span>
-                        </button>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span>📋 Чаты</span>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу" data-tooltip="Фильтровать чаты по статусу диалога">
+                                <span>🔍</span>
+                                <span>Фильтр</span>
+                                <span id="filterBadge" class="filter-badge" style="display: none;"></span>
+                            </button>
+                            <button class="collapse-btn" id="collapseBtn" title="Свернуть панель" data-tooltip="Скрыть панель чатов для экономии места">
+                                <span class="collapse-icon" id="collapseIcon">◀</span>
+                            </button>
+                        </div>
                     </div>
+                    
+                    <!-- ПОЛЕ УМНОГО ПОИСКА -->
+                    <input type="text" 
+                           id="searchChatsInput" 
+                           placeholder="🔍 Поиск по имени, ID или тексту сообщения...">
                 </div>
                 
                 <div class="filter-panel" id="filterPanel">
@@ -1017,6 +1095,18 @@
                         <button class="compact-btn" id="compactExportBtn" data-tooltip="Экспортировать чаты за выбранный период">📊</button>
                         <a href="/api/export/csv" class="compact-btn" data-tooltip="Экспорт всех чатов в CSV">📥</a>
                         <a href="/api/export/pdf" class="compact-btn" data-tooltip="Экспорт всех чатов в PDF">📄</a>
+                    </div>
+                    
+                    <!-- UTM-МЕТКИ ТЕКУЩЕГО КЛИЕНТА -->
+                    <div id="utmInfoBlock" class="utm-info-block" style="display: none;">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                            <span>📊</span>
+                            <strong>UTM-метки клиента</strong>
+                            <span style="font-size: 9px; color: var(--text-muted);">(первые касания)</span>
+                        </div>
+                        <div id="utmContent" class="utm-grid">
+                            <!-- Сюда будут подгружаться UTM-метки -->
+                        </div>
                     </div>
                 </div>
                 <div class="messages-container" id="messagesContainer"></div>
@@ -1141,12 +1231,13 @@
         let currentStatusFilter = 'all';
         let filterPanelVisible = false;
         let sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+        let searchTimeout = null;
+        let currentSearchQuery = '';
         
         // ========== ФУНКЦИЯ ОБНОВЛЕНИЯ ЗАГОЛОВКА ==========
         function updateCrmTitle(botName) {
             const botNameTag = document.getElementById('botNameTag');
             
-            // Извлекаем username из полного названия бота
             let displayName = botName;
             if (displayName && !displayName.startsWith('@')) {
                 displayName = '@' + displayName;
@@ -1169,7 +1260,6 @@
                         `<option value="${bot.id}" ${bot.is_active ? 'selected' : ''}>${bot.name}</option>`
                     ).join('');
                     
-                    // Устанавливаем имя активного бота в заголовок
                     const activeBot = data.bots.find(bot => bot.is_active);
                     if (activeBot) {
                         updateCrmTitle(activeBot.name);
@@ -1192,7 +1282,6 @@
                 
                 if (res.ok) {
                     const data = await res.json();
-                    // Обновляем заголовок с именем нового бота
                     updateCrmTitle(data.bot_name);
                     
                     currentChatId = null;
@@ -1392,7 +1481,11 @@
             });
         }
         
-        // ========== ЗАГРУЗКА ЧАТОВ ==========
+        // ========== ЗАГРУЗКА ЧАТОВ С ПОИСКОМ ==========
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+        
         function getStatusBadgeClass(status) {
             const map = {
                 'первое сообщение': 'new',
@@ -1415,25 +1508,36 @@
         
         async function loadChats() {
             try {
-                let url = '/api/chats';
-                if (currentStatusFilter !== 'all') {
-                    url += `?status=${encodeURIComponent(currentStatusFilter)}`;
+                let url = `/api/chats/search?limit=200`;
+                if (currentSearchQuery && currentSearchQuery.trim()) {
+                    url += `&q=${encodeURIComponent(currentSearchQuery.trim())}`;
                 }
+                if (currentStatusFilter !== 'all') {
+                    url += `&status=${encodeURIComponent(currentStatusFilter)}`;
+                }
+                
                 const res = await fetch(url);
                 const data = await res.json();
                 const container = document.getElementById('chatsList');
                 
-                if (!data.chats.length) {
-                    container.innerHTML = '<div class="empty-state">Нет чатов</div>';
+                if (!data.chats || !data.chats.length) {
+                    container.innerHTML = '<div class="empty-state">❌ Ничего не найдено</div>';
                     return;
                 }
                 
                 container.innerHTML = data.chats.map(chat => {
                     const statusClass = getStatusBadgeClass(chat.dialog_status);
                     const statusDisplay = getStatusDisplayName(chat.dialog_status);
+                    let displayName = escapeHtml(chat.full_name || chat.username || 'User');
+                    
+                    if (currentSearchQuery && currentSearchQuery.trim()) {
+                        const regex = new RegExp(`(${escapeRegex(currentSearchQuery)})`, 'gi');
+                        displayName = displayName.replace(regex, '<mark>$1</mark>');
+                    }
+                    
                     return `
                         <div class="chat-item" onclick="selectChat(${chat.id})" data-chat-id="${chat.id}">
-                            <div class="chat-name">${escapeHtml(chat.full_name || chat.username || 'User')}</div>
+                            <div class="chat-name">${displayName}</div>
                             <div class="status-badge ${statusClass}">${statusDisplay}</div>
                             ${chat.utm_source ? `<div class="utm-badge">📊 ${escapeHtml(chat.utm_source)}</div>` : ''}
                             <div class="chat-status">ID: ${chat.user_id}</div>
@@ -1441,8 +1545,20 @@
                     `;
                 }).join('');
             } catch(e) {
-                console.error(e);
+                console.error('Search error:', e);
             }
+        }
+        
+        // Обработчик поиска с debounce
+        const searchInput = document.getElementById('searchChatsInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                if (searchTimeout) clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    currentSearchQuery = e.target.value;
+                    loadChats();
+                }, 300);
+            });
         }
         
         function escapeHtml(text) {
@@ -1452,32 +1568,98 @@
             return div.innerHTML;
         }
         
+        // ========== UTM-МЕТКИ ДЛЯ ЧАТА ==========
+        async function loadUtmForChat(chatId) {
+            try {
+                const res = await fetch(`/api/chats/${chatId}/full`);
+                const chat = await res.json();
+                
+                const utmBlock = document.getElementById('utmInfoBlock');
+                const utmContent = document.getElementById('utmContent');
+                
+                const utmFields = [
+                    { key: 'utm_source', label: '📡 Источник', value: chat.utm_source },
+                    { key: 'utm_medium', label: '📊 Тип трафика', value: chat.utm_medium },
+                    { key: 'utm_campaign', label: '🎯 Кампания', value: chat.utm_campaign },
+                    { key: 'utm_term', label: '🔑 Ключевое слово', value: chat.utm_term },
+                    { key: 'utm_content', label: '📝 Контент', value: chat.utm_content }
+                ];
+                
+                const hasAnyUtm = utmFields.some(f => f.value);
+                
+                if (hasAnyUtm) {
+                    utmContent.innerHTML = utmFields
+                        .filter(f => f.value)
+                        .map(f => `
+                            <div class="utm-field">
+                                <span class="utm-label">${f.label}</span>
+                                <span class="utm-value">${escapeHtml(f.value)}</span>
+                            </div>
+                        `).join('');
+                    utmBlock.style.display = 'block';
+                } else {
+                    utmContent.innerHTML = '<div style="grid-column: span 2; text-align: center; color: var(--text-muted);">Нет UTM-меток</div>';
+                    utmBlock.style.display = 'block';
+                }
+                
+                if (chat.referrer || chat.gclid || chat.start_param) {
+                    const extraDiv = document.createElement('div');
+                    extraDiv.style.marginTop = '8px';
+                    extraDiv.style.paddingTop = '6px';
+                    extraDiv.style.borderTop = '1px solid var(--border)';
+                    extraDiv.style.fontSize = '9px';
+                    extraDiv.style.display = 'flex';
+                    extraDiv.style.flexDirection = 'column';
+                    extraDiv.style.gap = '4px';
+                    
+                    let extraHtml = '';
+                    if (chat.referrer) extraHtml += `<div><span style="color: var(--text-muted);">🔄 Referrer:</span> ${escapeHtml(chat.referrer)}</div>`;
+                    if (chat.gclid) extraHtml += `<div><span style="color: var(--text-muted);">🔗 GCLID:</span> ${escapeHtml(chat.gclid.substring(0, 30))}...</div>`;
+                    if (chat.start_param) extraHtml += `<div><span style="color: var(--text-muted);">🚀 Start param:</span> ${escapeHtml(chat.start_param)}</div>`;
+                    
+                    extraDiv.innerHTML = extraHtml;
+                    utmContent.appendChild(extraDiv);
+                }
+                
+            } catch(e) {
+                console.error('Error loading UTM:', e);
+            }
+        }
+        
         // ========== ВЫБОР ЧАТА ==========
-        async function selectChat(chatId) {
+        window.selectChat = async function(chatId) {
             currentChatId = chatId;
             
             document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
-            document.querySelector(`.chat-item[data-chat-id="${chatId}"]`).classList.add('active');
+            const selectedElement = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
+            if (selectedElement) selectedElement.classList.add('active');
             
-            const chatRes = await fetch(`/api/chats/${chatId}`);
-            const chat = await chatRes.json();
-            const chatName = chat.full_name || chat.username || 'User';
-            document.getElementById('chatName').innerText = chatName;
-            document.getElementById('chatNameCompact').innerText = chatName;
-            document.getElementById('statusSelect').value = chat.dialog_status || 'первое сообщение';
-            document.getElementById('compactStatus').innerHTML = getStatusIcon(chat.dialog_status);
-            
-            currentAutoMode = chat.auto_mode;
-            const autoBtn = document.getElementById('toggleAutoBtn');
-            const compactAutoBtn = document.getElementById('compactAutoBtn');
-            autoBtn.textContent = currentAutoMode ? 'Авторежим ВКЛ' : 'Авторежим ВЫКЛ';
-            autoBtn.className = currentAutoMode ? 'toggle-auto-btn' : 'toggle-auto-btn off';
-            compactAutoBtn.style.opacity = currentAutoMode ? '1' : '0.5';
-            
-            document.getElementById('messagesArea').style.display = 'flex';
-            await loadMessages(chatId);
-            await fetch(`/api/chats/${chatId}/mark-read`, { method: 'POST' });
-        }
+            try {
+                const chatRes = await fetch(`/api/chats/${chatId}/full`);
+                const chat = await chatRes.json();
+                
+                const chatName = chat.full_name || chat.username || 'User';
+                document.getElementById('chatName').innerText = chatName;
+                document.getElementById('chatNameCompact').innerText = chatName;
+                document.getElementById('statusSelect').value = chat.dialog_status || 'первое сообщение';
+                document.getElementById('compactStatus').innerHTML = getStatusIcon(chat.dialog_status);
+                
+                currentAutoMode = chat.auto_mode;
+                const autoBtn = document.getElementById('toggleAutoBtn');
+                const compactAutoBtn = document.getElementById('compactAutoBtn');
+                autoBtn.textContent = currentAutoMode ? 'Авторежим ВКЛ' : 'Авторежим ВЫКЛ';
+                autoBtn.className = currentAutoMode ? 'toggle-auto-btn' : 'toggle-auto-btn off';
+                compactAutoBtn.style.opacity = currentAutoMode ? '1' : '0.5';
+                
+                await loadUtmForChat(chatId);
+                
+                document.getElementById('messagesArea').style.display = 'flex';
+                await loadMessages(chatId);
+                await fetch(`/api/chats/${chatId}/mark-read`, { method: 'POST' });
+            } catch(e) {
+                console.error('Error loading chat:', e);
+            }
+        };
         
         function getStatusIcon(status) {
             const icons = {
@@ -1583,16 +1765,16 @@
             `).join('');
         }
         
-        function useTemplate(templateId) {
+        window.useTemplate = function(templateId) {
             const template = templates.find(t => t.id === templateId);
             if (template && currentChatId) {
                 document.getElementById('messageInput').value = template.text;
                 document.getElementById('messageInput').focus();
                 closeTemplatesModal();
             }
-        }
+        };
         
-        async function addTemplate() {
+        window.addTemplate = async function() {
             const title = document.getElementById('newTemplateTitle').value.trim();
             const text = document.getElementById('newTemplateText').value.trim();
             
@@ -1614,16 +1796,16 @@
             } else {
                 alert('Ошибка добавления шаблона');
             }
-        }
+        };
         
         function openTemplatesModal() {
             document.getElementById('templatesModal').classList.add('active');
             loadTemplates();
         }
         
-        function closeTemplatesModal() {
+        window.closeTemplatesModal = function() {
             document.getElementById('templatesModal').classList.remove('active');
-        }
+        };
         
         // ========== ЭКСПОРТ ПО ПЕРИОДУ ==========
         async function exportPeriod() {
@@ -1673,11 +1855,6 @@
             loadChats();
             if (currentChatId) loadMessages(currentChatId);
         }, 10000);
-        
-        window.selectChat = selectChat;
-        window.useTemplate = useTemplate;
-        window.addTemplate = addTemplate;
-        window.closeTemplatesModal = closeTemplatesModal;
     </script>
 </body>
 </html>
