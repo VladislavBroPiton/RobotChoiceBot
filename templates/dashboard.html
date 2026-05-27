@@ -76,17 +76,17 @@
         .header {
             background: var(--accent);
             color: white;
-            padding: 12px 24px;
+            padding: 10px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 20px;
+        .header-left h1 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
         }
         
         /* ========== МЕНЮ С ТРЕМЯ ТОЧКАМИ ========== */
@@ -97,8 +97,8 @@
         .menu-btn {
             background: rgba(255,255,255,0.2);
             border: none;
-            border-radius: 30px;
-            padding: 8px 16px;
+            border-radius: 8px;
+            padding: 6px 12px;
             cursor: pointer;
             font-size: 18px;
             color: white;
@@ -115,7 +115,7 @@
         
         .menu-dropdown {
             position: absolute;
-            top: 45px;
+            top: 40px;
             right: 0;
             background: var(--menu-bg);
             border-radius: 12px;
@@ -138,14 +138,14 @@
         }
         
         .menu-item {
-            padding: 12px 16px;
+            padding: 10px 14px;
             display: flex;
             align-items: center;
             gap: 12px;
             cursor: pointer;
             transition: background 0.2s;
             color: var(--text-primary);
-            font-size: 14px;
+            font-size: 13px;
         }
         
         .menu-item:hover {
@@ -153,7 +153,7 @@
         }
         
         .menu-item .icon {
-            font-size: 16px;
+            font-size: 14px;
             width: 20px;
             text-align: center;
         }
@@ -173,37 +173,37 @@
         }
         
         .bot-select-inline label {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
         }
         
         .bot-select-inline select {
             flex: 1;
-            padding: 6px 10px;
+            padding: 5px 8px;
             border-radius: 6px;
             border: 1px solid var(--border);
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 13px;
+            font-size: 12px;
             cursor: pointer;
         }
         
         .tabs {
             display: flex;
-            gap: 10px;
-            padding: 12px 20px;
+            gap: 8px;
+            padding: 10px 20px;
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border);
         }
         
         .tab-btn {
-            padding: 8px 16px;
+            padding: 6px 14px;
             border-radius: 20px;
             border: 1px solid var(--border);
             background: var(--button-secondary);
             color: var(--text-primary);
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 500;
             transition: all 0.2s;
             position: relative;
@@ -268,7 +268,7 @@
         
         .main-content {
             display: flex;
-            height: calc(100vh - 110px);
+            height: calc(100vh - 95px);
         }
         
         .chats-sidebar {
@@ -291,7 +291,7 @@
         }
         
         .chats-header {
-            padding: 16px;
+            padding: 12px 16px;
             border-bottom: 1px solid var(--border);
             font-weight: 600;
             color: var(--text-primary);
@@ -299,19 +299,20 @@
             justify-content: space-between;
             align-items: center;
             background: var(--bg-sidebar);
+            font-size: 14px;
         }
         
         .filter-btn {
             background: var(--button-secondary);
             border: 1px solid var(--border);
             border-radius: 20px;
-            padding: 6px 14px;
+            padding: 4px 12px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-primary);
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             transition: all 0.2s;
             position: relative;
         }
@@ -331,9 +332,9 @@
             background: var(--button-secondary);
             border: 1px solid var(--border);
             border-radius: 20px;
-            padding: 6px 10px;
+            padding: 4px 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 12px;
             transition: all 0.2s;
             position: relative;
         }
@@ -345,11 +346,11 @@
         
         .filter-panel {
             display: none;
-            padding: 12px 16px;
+            padding: 10px 12px;
             border-bottom: 1px solid var(--border);
             background: var(--bg-primary);
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
         }
         
         .filter-panel.show {
@@ -358,32 +359,32 @@
         
         .filter-row {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             align-items: center;
             flex-wrap: wrap;
         }
         
         .filter-label {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-secondary);
             font-weight: 500;
         }
         
         .status-filter {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
         }
         
         .status-filter-btn {
             position: relative;
-            padding: 4px 10px;
-            border-radius: 16px;
+            padding: 3px 8px;
+            border-radius: 14px;
             border: 1px solid var(--border);
             background: var(--bg-secondary);
             color: var(--text-primary);
             cursor: pointer;
-            font-size: 11px;
+            font-size: 10px;
             transition: all 0.2s;
         }
         
@@ -398,10 +399,10 @@
         }
         
         .filter-clear {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--accent);
             cursor: pointer;
-            padding: 4px 8px;
+            padding: 3px 6px;
             border-radius: 4px;
         }
         
@@ -413,8 +414,8 @@
             background: var(--accent);
             color: white;
             border-radius: 10px;
-            padding: 2px 6px;
-            font-size: 10px;
+            padding: 2px 5px;
+            font-size: 9px;
             margin-left: 4px;
         }
         
@@ -424,7 +425,7 @@
         }
         
         .chat-item {
-            padding: 14px 16px;
+            padding: 12px 14px;
             border-bottom: 1px solid var(--border-light);
             cursor: pointer;
             transition: background 0.15s;
@@ -443,13 +444,14 @@
             font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 4px;
+            font-size: 14px;
         }
         
         .status-badge {
             display: inline-block;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 9px;
             font-weight: 600;
             margin-top: 4px;
         }
@@ -460,12 +462,12 @@
         .status-badge.closed { background: var(--status-closed); color: white; }
         
         .utm-badge {
-            font-size: 10px;
+            font-size: 9px;
             color: var(--accent);
             margin-top: 4px;
             display: inline-block;
             background: var(--accent-light);
-            padding: 2px 6px;
+            padding: 2px 5px;
             border-radius: 10px;
         }
         
@@ -478,7 +480,7 @@
         
         .messages-header {
             background: var(--bg-secondary);
-            padding: 14px 24px;
+            padding: 12px 20px;
             border-bottom: 1px solid var(--border);
             transition: all 0.3s ease;
         }
@@ -488,7 +490,7 @@
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 10px;
         }
         
         .toolbar-compact {
@@ -506,9 +508,9 @@
             background: var(--button-secondary);
             border: 1px solid var(--border);
             border-radius: 6px;
-            padding: 6px 10px;
+            padding: 5px 8px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             transition: all 0.2s;
             text-decoration: none;
             color: var(--text-primary);
@@ -524,10 +526,10 @@
         }
         
         .compact-status {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-secondary);
             background: var(--bg-primary);
-            padding: 6px 10px;
+            padding: 5px 8px;
             border-radius: 6px;
             border: 1px solid var(--border);
         }
@@ -535,7 +537,7 @@
         .selected-chat-name {
             font-weight: 600;
             color: var(--text-primary);
-            font-size: 16px;
+            font-size: 14px;
         }
         
         .messages-container {
@@ -549,10 +551,10 @@
         
         .message {
             max-width: 65%;
-            padding: 10px 14px;
+            padding: 8px 12px;
             border-radius: 12px;
             word-wrap: break-word;
-            font-size: 14px;
+            font-size: 13px;
             position: relative;
         }
         
@@ -576,7 +578,7 @@
         }
         
         .message-time {
-            font-size: 10px;
+            font-size: 9px;
             margin-top: 4px;
             opacity: 0.7;
         }
@@ -584,17 +586,17 @@
         .message-input-container {
             background: var(--bg-secondary);
             border-top: 1px solid var(--border);
-            padding: 16px 24px;
+            padding: 12px 20px;
             display: flex;
-            gap: 12px;
+            gap: 10px;
         }
         
         .message-input {
             flex: 1;
-            padding: 12px 16px;
+            padding: 10px 14px;
             border: 2px solid var(--border);
             border-radius: 20px;
-            font-size: 14px;
+            font-size: 13px;
             resize: none;
             font-family: inherit;
             background: var(--bg-primary);
@@ -606,31 +608,33 @@
             color: white;
             border: none;
             border-radius: 50%;
-            width: 44px;
-            height: 44px;
+            width: 36px;
+            height: 36px;
             cursor: pointer;
-            font-size: 20px;
+            font-size: 18px;
             transition: background 0.2s;
             position: relative;
         }
         
         .status-select {
-            padding: 6px 12px;
+            padding: 5px 10px;
             border-radius: 6px;
             border: 1px solid var(--border);
             background: var(--bg-primary);
             color: var(--text-primary);
+            font-size: 12px;
         }
         
         .toggle-auto-btn {
             background: var(--accent);
             color: white;
             border: none;
-            padding: 6px 12px;
+            padding: 5px 10px;
             border-radius: 6px;
             cursor: pointer;
             transition: background 0.2s;
             position: relative;
+            font-size: 12px;
         }
         
         .toggle-auto-btn.off {
@@ -641,10 +645,10 @@
             background: var(--button-secondary);
             color: var(--text-primary);
             border: 1px solid var(--border);
-            padding: 6px 12px;
+            padding: 5px 10px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             position: relative;
         }
         
@@ -656,6 +660,7 @@
             text-align: center;
             padding: 40px;
             color: var(--text-muted);
+            font-size: 13px;
         }
         
         ::-webkit-scrollbar { width: 6px; }
@@ -664,19 +669,19 @@
         
         .export-buttons {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             align-items: center;
             flex-wrap: wrap;
         }
         
         .export-link {
-            padding: 6px 12px;
+            padding: 5px 10px;
             border-radius: 6px;
             border: 1px solid var(--border);
             background: var(--button-secondary);
             color: var(--text-primary);
             text-decoration: none;
-            font-size: 14px;
+            font-size: 12px;
             transition: all 0.2s;
             position: relative;
         }
@@ -687,58 +692,59 @@
         }
         
         .date-input {
-            padding: 6px 10px;
+            padding: 5px 8px;
             border-radius: 6px;
             border: 1px solid var(--border);
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 13px;
+            font-size: 12px;
         }
         
         .stats-container {
             flex: 1;
             overflow-y: auto;
-            padding: 24px;
+            padding: 20px;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 24px;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
         }
         
         .stats-card {
             background: var(--bg-secondary);
-            border-radius: 16px;
+            border-radius: 12px;
             border: 1px solid var(--border);
-            padding: 20px;
+            padding: 16px;
         }
         
         .stats-card h3 {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
             border-bottom: 1px solid var(--border);
         }
         
         .stats-list {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
         }
         
         .stats-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 0;
+            padding: 6px 0;
             border-bottom: 1px solid var(--border-light);
+            font-size: 13px;
         }
         
         .stats-name {
-            font-size: 14px;
+            font-size: 13px;
         }
         
         .stats-count {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             color: var(--accent);
             background: var(--accent-light);
@@ -763,9 +769,9 @@
         
         .modal-content {
             background: var(--bg-secondary);
-            border-radius: 16px;
+            border-radius: 12px;
             width: 90%;
-            max-width: 500px;
+            max-width: 450px;
             max-height: 80vh;
             overflow: hidden;
             display: flex;
@@ -773,31 +779,32 @@
         }
         
         .modal-header {
-            padding: 16px 20px;
+            padding: 14px 18px;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
             font-weight: 600;
+            font-size: 14px;
         }
         
         .modal-close {
             cursor: pointer;
-            font-size: 24px;
+            font-size: 22px;
             color: var(--text-muted);
         }
         
         .modal-body {
-            padding: 20px;
+            padding: 16px;
             overflow-y: auto;
             flex: 1;
         }
         
         .template-item {
-            padding: 12px;
+            padding: 10px;
             border: 1px solid var(--border);
             border-radius: 8px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             cursor: pointer;
             transition: all 0.2s;
             background: var(--bg-primary);
@@ -811,37 +818,40 @@
         .template-title {
             font-weight: 600;
             margin-bottom: 4px;
+            font-size: 13px;
         }
         
         .template-text {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-secondary);
         }
         
         .add-template-form {
-            margin-top: 20px;
-            padding-top: 20px;
+            margin-top: 16px;
+            padding-top: 16px;
             border-top: 1px solid var(--border);
         }
         
         .add-template-form input, .add-template-form textarea {
             width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 8px;
+            margin-bottom: 8px;
             border: 1px solid var(--border);
             border-radius: 8px;
             background: var(--bg-primary);
             color: var(--text-primary);
+            font-size: 12px;
         }
         
         .add-template-btn {
             width: 100%;
-            padding: 10px;
+            padding: 8px;
             background: var(--accent);
             color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
+            font-size: 13px;
         }
         
         .show-sidebar-btn {
@@ -853,10 +863,10 @@
             color: white;
             border: none;
             border-radius: 0 8px 8px 0;
-            padding: 12px 8px;
+            padding: 10px 6px;
             cursor: pointer;
             z-index: 100;
-            font-size: 20px;
+            font-size: 16px;
             transition: all 0.3s;
             opacity: 0;
             pointer-events: none;
@@ -874,10 +884,10 @@
             transform: translateX(-50%);
             background: #333;
             color: white;
-            padding: 10px 20px;
+            padding: 8px 16px;
             border-radius: 30px;
             z-index: 2000;
-            font-size: 14px;
+            font-size: 13px;
             animation: fadeOut 3s forwards;
         }
         
@@ -932,7 +942,7 @@
             <div class="chats-sidebar" id="chatsSidebar">
                 <div class="chats-header" id="chatsHeader">
                     <span>📋 Чаты</span>
-                    <div style="display: flex; gap: 8px;">
+                    <div style="display: flex; gap: 6px;">
                         <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу" data-tooltip="Фильтровать чаты по статусу диалога">
                             <span>🔍</span>
                             <span>Фильтр</span>
@@ -967,7 +977,7 @@
                 <div class="messages-header" id="messagesHeader">
                     <div class="toolbar-full" id="toolbarFull">
                         <div><strong id="chatName" class="selected-chat-name"></strong></div>
-                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                             <select id="statusSelect" class="status-select" data-tooltip="Изменить статус диалога">
                                 <option value="первое сообщение">первое сообщение</option>
                                 <option value="ожидание менеджера">ожидание менеджера</option>
