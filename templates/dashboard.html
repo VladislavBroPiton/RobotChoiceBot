@@ -511,6 +511,144 @@
             color: #34c759;
         }
         
+        /* ========== НОВЫЕ СТИЛИ ДЛЯ МЕНЮ ДЕЙСТВИЙ ========== */
+        .message-actions {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-left: 6px;
+        }
+        
+        .message-actions:hover {
+            background: var(--accent-light);
+        }
+        
+        .message-actions .dots {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--text-muted);
+        }
+        
+        .actions-menu {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            margin-bottom: 8px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: var(--menu-shadow);
+            min-width: 160px;
+            z-index: 1000;
+            display: none;
+            overflow: hidden;
+        }
+        
+        .actions-menu.show {
+            display: block;
+            animation: fadeIn 0.2s ease;
+        }
+        
+        .action-item {
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+        
+        .action-item:hover {
+            background: var(--accent-light);
+        }
+        
+        /* ========== БЫСТРЫЕ КНОПКИ-ОТВЕТЫ ========== */
+        .quick-reply-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 16px;
+            justify-content: center;
+        }
+        
+        .quick-reply-btn {
+            background: var(--accent-light);
+            border: 1px solid var(--accent);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 12px;
+            color: var(--accent);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-reply-btn:hover {
+            background: var(--accent);
+            color: white;
+        }
+        
+        /* ========== МЕДИА-ВЛОЖЕНИЯ ========== */
+        .message-media {
+            margin-top: 8px;
+            cursor: pointer;
+            border-radius: 12px;
+            overflow: hidden;
+            max-width: 200px;
+        }
+        
+        .message-media img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 12px;
+            transition: transform 0.2s;
+        }
+        
+        .message-media img:hover {
+            transform: scale(1.02);
+        }
+        
+        .media-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        .media-modal.active {
+            display: flex;
+        }
+        
+        .media-modal img, .media-modal video {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+        }
+        
+        .media-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 40px;
+            color: white;
+            cursor: pointer;
+        }
+        
         /* ========== ПОДСВЕТКА ПОИСКА ========== */
         mark {
             background: var(--accent);
@@ -1640,6 +1778,13 @@
         </div>
     </div>
 
+    <!-- МОДАЛЬНОЕ ОКНО ДЛЯ ПРОСМОТРА МЕДИА -->
+    <div class="media-modal" id="mediaModal" onclick="closeMediaModal()">
+        <span class="media-close" onclick="closeMediaModal()">&times;</span>
+        <img id="mediaImage" style="display: none;">
+        <video id="mediaVideo" controls style="display: none;"></video>
+    </div>
+
     <script>
         // ========== МЕНЮ ==========
         const menuBtn = document.getElementById('menuBtn');
@@ -1745,6 +1890,7 @@
         let sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
         let searchTimeout = null;
         let currentSearchQuery = '';
+        let currentActionsMessageId = null;
         
         // ========== ФУНКЦИЯ ОБНОВЛЕНИЯ ЗАГОЛОВКА ==========
         function updateCrmTitle(botName) {
@@ -2076,6 +2222,166 @@
             return div.innerHTML;
         }
         
+        // ========== ФУНКЦИИ ДЛЯ МЕНЮ ДЕЙСТВИЙ ==========
+        function toggleMessageActions(messageId, event) {
+            event.stopPropagation();
+            const menu = document.getElementById(`actions-menu-${messageId}`);
+            if (currentActionsMessageId && currentActionsMessageId !== messageId) {
+                const prevMenu = document.getElementById(`actions-menu-${currentActionsMessageId}`);
+                if (prevMenu) prevMenu.classList.remove('show');
+            }
+            if (menu) menu.classList.toggle('show');
+            currentActionsMessageId = menu.classList.contains('show') ? messageId : null;
+        }
+        
+        document.addEventListener('click', () => {
+            if (currentActionsMessageId) {
+                const menu = document.getElementById(`actions-menu-${currentActionsMessageId}`);
+                if (menu) menu.classList.remove('show');
+                currentActionsMessageId = null;
+            }
+        });
+        
+        async function pinMessage(messageId, text) {
+            showToast(`📌 Сообщение закреплено: ${text.substring(0, 50)}...`);
+            // TODO: реализовать API для закрепления
+        }
+        
+        async function resendMessage(messageId, text) {
+            if (!currentChatId) return;
+            const res = await fetch(`/api/chats/${currentChatId}/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+            if (res.ok) showToast('✅ Сообщение переотправлено');
+            else showToast('❌ Ошибка переотправки');
+        }
+        
+        async function deleteMessage(messageId) {
+            if (confirm('Удалить это сообщение?')) {
+                // TODO: реализовать API для удаления
+                showToast('🗑 Сообщение удалено');
+                if (currentChatId) loadMessages(currentChatId);
+            }
+        }
+        
+        // ========== МЕДИА-ВЛОЖЕНИЯ ==========
+        function openMediaModal(url, type) {
+            const modal = document.getElementById('mediaModal');
+            const img = document.getElementById('mediaImage');
+            const video = document.getElementById('mediaVideo');
+            img.style.display = 'none';
+            video.style.display = 'none';
+            if (type === 'image') {
+                img.src = url;
+                img.style.display = 'block';
+            } else if (type === 'video') {
+                video.src = url;
+                video.style.display = 'block';
+                video.load();
+            }
+            modal.classList.add('active');
+        }
+        
+        function closeMediaModal() {
+            const modal = document.getElementById('mediaModal');
+            const video = document.getElementById('mediaVideo');
+            if (video) video.pause();
+            modal.classList.remove('active');
+        }
+        
+        // ========== БЫСТРЫЕ КНОПКИ-ОТВЕТЫ ==========
+        const quickReplies = [
+            { text: '✅ Да', value: 'Да' },
+            { text: '❌ Нет', value: 'Нет' },
+            { text: '📊 Подробнее', value: 'Расскажите подробнее' },
+            { text: '🤖 Хочу робота', value: 'Хочу подключить торгового робота' }
+        ];
+        
+        function renderQuickReplies() {
+            return `<div class="quick-reply-buttons">${quickReplies.map(qr => `<button class="quick-reply-btn" onclick="sendQuickReply('${escapeHtml(qr.value)}')">${escapeHtml(qr.text)}</button>`).join('')}</div>`;
+        }
+        
+        async function sendQuickReply(text) {
+            if (!currentChatId) return;
+            const res = await fetch(`/api/chats/${currentChatId}/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+            if (res.ok) {
+                document.getElementById('messageInput').value = '';
+                await loadMessages(currentChatId);
+            }
+        }
+        
+        // ========== ЗАГРУЗКА СООБЩЕНИЙ (ОБНОВЛЕННАЯ ВЕРСИЯ) ==========
+        async function loadMessages(chatId) {
+            const res = await fetch(`/api/chats/${chatId}/messages`);
+            const data = await res.json();
+            const container = document.getElementById('messagesContainer');
+            
+            if (!data.messages.length) {
+                container.innerHTML = '<div class="empty-state">Нет сообщений</div>';
+                return;
+            }
+            
+            function getSenderInfo(senderType) {
+                switch(senderType) {
+                    case 'user':
+                        return { icon: '👤', name: 'Клиент' };
+                    case 'bot':
+                        return { icon: '🤖', name: 'RobotChoiceBot' };
+                    case 'operator':
+                        return { icon: '👨‍💼', name: 'Оператор' };
+                    default:
+                        return { icon: '💬', name: 'Сообщение' };
+                }
+            }
+            
+            container.innerHTML = data.messages.map(msg => {
+                const sender = getSenderInfo(msg.sender_type);
+                const time = new Date(msg.timestamp).toLocaleTimeString();
+                const messageText = escapeHtml(msg.message_text || '[Сообщение]');
+                const messageLines = messageText.split('\n').map(line => `<p>${line || '<br>'}</p>`).join('');
+                
+                // Проверка на медиа-вложение (изображение)
+                const isImage = msg.file_id && (msg.message_text?.includes('.jpg') || msg.message_text?.includes('.png') || msg.message_text?.includes('.jpeg') || msg.message_text?.includes('.gif') || msg.message_text?.includes('.webp'));
+                const isVideo = msg.file_id && (msg.message_text?.includes('.mp4') || msg.message_text?.includes('.webm') || msg.message_text?.includes('.mov'));
+                const mediaHtml = isImage ? `<div class="message-media" onclick="openMediaModal('${msg.file_id}', 'image')"><img src="${msg.file_id}" alt="Вложение"></div>` : '';
+                const videoHtml = isVideo ? `<div class="message-media" onclick="openMediaModal('${msg.file_id}', 'video')"><video src="${msg.file_id}" style="width:100%; border-radius:12px;"></video></div>` : '';
+                
+                return `
+                    <div class="message ${msg.sender_type}">
+                        <div class="message-sender">
+                            <span class="sender-icon">${sender.icon}</span>
+                            <span class="sender-name">${escapeHtml(sender.name)}</span>
+                            <div class="message-actions" onclick="toggleMessageActions(${msg.id}, event)">
+                                <span class="dots">⋮</span>
+                                <div class="actions-menu" id="actions-menu-${msg.id}">
+                                    <div class="action-item" onclick="pinMessage(${msg.id}, '${messageText.replace(/'/g, "\\'")}')"><span>📌</span> Закрепить</div>
+                                    <div class="action-item" onclick="resendMessage(${msg.id}, '${messageText.replace(/'/g, "\\'")}')"><span>🔄</span> Переотправить</div>
+                                    <div class="action-item" onclick="deleteMessage(${msg.id})"><span>🗑</span> Удалить</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="message-text">${messageLines}</div>
+                        ${mediaHtml}
+                        ${videoHtml}
+                        <div class="message-time">
+                            ${time}
+                            ${msg.sender_type === 'operator' ? '<span class="read-status read">✓✓</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Добавляем быстрые кнопки-ответы в конец
+            container.innerHTML += renderQuickReplies();
+            container.scrollTop = container.scrollHeight;
+        }
+        
         // ========== UTM-МЕТКИ ДЛЯ ЧАТА ==========
         async function loadUtmForChat(chatId) {
             try {
@@ -2202,7 +2508,7 @@
                             <td class="utm-history-value">${campaign}</td>
                             <td class="utm-history-value">${term}</td>
                             <td class="utm-history-value">${content}</td>
-                        </tr>
+                        </table>
                     `;
                 }
                 
@@ -2225,53 +2531,6 @@
         
         function closeUtmHistoryModal() {
             document.getElementById('utmHistoryModal').classList.remove('active');
-        }
-        
-        // ========== ЗАГРУЗКА СООБЩЕНИЙ С МЕТКАМИ ОТПРАВИТЕЛЯ ==========
-        async function loadMessages(chatId) {
-            const res = await fetch(`/api/chats/${chatId}/messages`);
-            const data = await res.json();
-            const container = document.getElementById('messagesContainer');
-            
-            if (!data.messages.length) {
-                container.innerHTML = '<div class="empty-state">Нет сообщений</div>';
-                return;
-            }
-            
-            function getSenderInfo(senderType) {
-                switch(senderType) {
-                    case 'user':
-                        return { icon: '👤', name: 'Клиент' };
-                    case 'bot':
-                        return { icon: '🤖', name: 'RobotChoiceBot' };
-                    case 'operator':
-                        return { icon: '👨‍💼', name: 'Оператор' };
-                    default:
-                        return { icon: '💬', name: 'Сообщение' };
-                }
-            }
-            
-            container.innerHTML = data.messages.map(msg => {
-                const sender = getSenderInfo(msg.sender_type);
-                const time = new Date(msg.timestamp).toLocaleTimeString();
-                
-                return `
-                    <div class="message ${msg.sender_type}">
-                        <div class="message-sender">
-                            <span class="sender-icon">${sender.icon}</span>
-                            <span class="sender-name">${escapeHtml(sender.name)}</span>
-                        </div>
-                        <div class="message-text">
-                            ${escapeHtml(msg.message_text || '[Сообщение]')}
-                        </div>
-                        <div class="message-time">
-                            ${time}
-                            ${msg.sender_type === 'operator' ? '<span class="read-status read">✓✓</span>' : ''}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-            container.scrollTop = container.scrollHeight;
         }
         
         // ========== ВЫБОР ЧАТА ==========
