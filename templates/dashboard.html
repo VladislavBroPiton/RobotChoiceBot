@@ -36,14 +36,14 @@
             --menu-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         
-        /* ========== ТЁМНАЯ ТЕМА ========== */
+        /* ========== ТЁМНАЯ ТЕМА (исправлена) ========== */
         body.dark {
             --bg-primary: #1a1a2e;
             --bg-secondary: #16213e;
             --bg-sidebar: #0f3460;
             --text-primary: #e8e8e8;
             --text-secondary: #b0b0c0;
-            --text-muted: #888888;
+            --text-muted: #a0a0b0;
             --border: #2a2a4a;
             --border-light: #1e1e3a;
             --accent: #00f0ff;
@@ -63,6 +63,261 @@
             --status-closed: #7f8c8d;
             --menu-bg: #2a2a4a;
             --menu-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        /* Дополнительные исправления для тёмной темы */
+        body.dark .message.user {
+            color: #e8e8e8;
+            background: #1e2a3a;
+            border-color: #2a2a4a;
+        }
+        
+        body.dark .message.user .message-time {
+            color: #888888;
+        }
+        
+        body.dark .status-select,
+        body.dark .date-input,
+        body.dark .message-input,
+        body.dark .compact-status,
+        body.dark .filter-btn,
+        body.dark .collapse-btn,
+        body.dark .templates-btn,
+        body.dark .export-link,
+        body.dark .compact-btn {
+            color: #e8e8e8;
+            background: #1a1a2e;
+            border-color: #2a2a4a;
+        }
+        
+        body.dark .status-select option {
+            background: #1a1a2e;
+            color: #e8e8e8;
+        }
+        
+        body.dark .chat-item .chat-status {
+            color: #888888;
+        }
+        
+        body.dark .empty-state {
+            color: #888888;
+        }
+        
+        body.dark .modal-content {
+            background: #16213e;
+            border-color: #2a2a4a;
+        }
+        
+        body.dark .template-item {
+            background: #1a1a2e;
+            border-color: #2a2a4a;
+            color: #e8e8e8;
+        }
+        
+        body.dark .template-title {
+            color: #e8e8e8;
+        }
+        
+        body.dark .template-text {
+            color: #b0b0c0;
+        }
+        
+        body.dark .add-template-form input,
+        body.dark .add-template-form textarea {
+            background: #1a1a2e;
+            border-color: #2a2a4a;
+            color: #e8e8e8;
+        }
+        
+        body.dark .add-template-form input::placeholder,
+        body.dark .add-template-form textarea::placeholder {
+            color: #888888;
+        }
+        
+        body.dark .utm-info-block {
+            background: #1a1a2e;
+            border-color: #2a2a4a;
+        }
+        
+        body.dark .utm-field .utm-label {
+            color: #888888;
+        }
+        
+        body.dark .utm-field .utm-value {
+            color: #00f0ff;
+        }
+        
+        body.dark .stats-card {
+            background: #16213e;
+            border-color: #2a2a4a;
+        }
+        
+        body.dark .stats-card h3 {
+            color: #e8e8e8;
+            border-bottom-color: #2a2a4a;
+        }
+        
+        body.dark .stats-item {
+            border-bottom-color: #2a2a4a;
+        }
+        
+        body.dark .stats-name {
+            color: #b0b0c0;
+        }
+        
+        body.dark .stats-count {
+            background: #1a3a5c;
+            color: #00f0ff;
+        }
+        
+        body.dark .utm-history-table th {
+            background: #1a3a5c;
+            color: #e8e8e8;
+        }
+        
+        body.dark .utm-history-table td {
+            border-bottom-color: #2a2a4a;
+            color: #b0b0c0;
+        }
+        
+        body.dark .utm-history-date {
+            color: #888888;
+        }
+        
+        body.dark .toast {
+            background: #333;
+            color: white;
+        }
+        
+        body.dark .menu-dropdown {
+            background: #1a1a2e;
+            border-color: #2a2a4a;
+        }
+        
+        body.dark .menu-item {
+            color: #e8e8e8;
+        }
+        
+        body.dark .menu-item:hover {
+            background: #1a3a5c;
+        }
+        
+        body.dark .bot-select-inline select {
+            background: #1a1a2e;
+            color: #e8e8e8;
+            border-color: #2a2a4a;
+        }
+        
+        body.dark .bot-select-inline label {
+            color: #b0b0c0;
+        }
+        
+        body.dark .filter-panel {
+            background: #1a1a2e;
+        }
+        
+        body.dark .filter-label {
+            color: #b0b0c0;
+        }
+        
+        body.dark .status-filter-btn {
+            background: #1a1a2e;
+            border-color: #2a2a4a;
+            color: #b0b0c0;
+        }
+        
+        body.dark .status-filter-btn:hover {
+            background: #1a3a5c;
+        }
+        
+        body.dark .status-filter-btn.active {
+            background: var(--accent);
+            color: #1a1a2e;
+        }
+        
+        body.dark .filter-clear {
+            color: #00f0ff;
+        }
+        
+        body.dark .chat-item .chat-name {
+            color: #e8e8e8;
+        }
+        
+        body.dark .chat-item .utm-badge {
+            background: #1a3a5c;
+            color: #00f0ff;
+        }
+        
+        body.dark #searchChatsInput {
+            background: #1a1a2e;
+            border-color: #2a2a4a;
+            color: #e8e8e8;
+        }
+        
+        body.dark #searchChatsInput::placeholder {
+            color: #888888;
+        }
+        
+        body.dark #searchChatsInput:focus {
+            border-color: #00f0ff;
+            box-shadow: 0 0 0 2px rgba(0, 240, 255, 0.2);
+        }
+        
+        body.dark .message-input {
+            background: #1a1a2e;
+            border-color: #2a2a4a;
+            color: #e8e8e8;
+        }
+        
+        body.dark .message-input::placeholder {
+            color: #888888;
+        }
+        
+        body.dark .send-button {
+            background: var(--accent);
+            color: #1a1a2e;
+        }
+        
+        body.dark .send-button:hover {
+            background: var(--accent-hover);
+        }
+        
+        body.dark .toggle-auto-btn {
+            background: var(--accent);
+            color: #1a1a2e;
+        }
+        
+        body.dark .toggle-auto-btn.off {
+            background: #444;
+            color: #e8e8e8;
+        }
+        
+        body.dark .tab-btn {
+            background: #1a1a2e;
+            border-color: #2a2a4a;
+            color: #b0b0c0;
+        }
+        
+        body.dark .tab-btn.active {
+            background: var(--accent);
+            color: #1a1a2e;
+        }
+        
+        body.dark .chats-header {
+            background: #0f3460;
+            color: #e8e8e8;
+        }
+        
+        body.dark .chats-sidebar {
+            background: #0f3460;
+        }
+        
+        body.dark .messages-header {
+            background: #16213e;
+        }
+        
+        body.dark .message-input-container {
+            background: #16213e;
         }
         
         /* ========== АКЦЕНТНЫЕ ЦВЕТА ========== */
@@ -96,38 +351,6 @@
         [title] {
             cursor: help;
             position: relative;
-        }
-        
-        [data-tooltip] {
-            position: relative;
-            cursor: help;
-        }
-        
-        [data-tooltip]:hover::after {
-            content: attr(data-tooltip);
-            position: fixed;
-            background: var(--tooltip-bg);
-            color: var(--tooltip-text);
-            padding: 8px 14px;
-            border-radius: 8px;
-            font-size: 12px;
-            white-space: nowrap;
-            z-index: 10000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            pointer-events: none;
-            margin-top: 28px;
-            margin-left: -10px;
-        }
-        
-        [data-tooltip]:hover::before {
-            content: '';
-            position: fixed;
-            border: 6px solid transparent;
-            border-bottom-color: var(--tooltip-bg);
-            z-index: 10000;
-            pointer-events: none;
-            margin-top: 16px;
-            margin-left: 5px;
         }
         
         /* ========== УЛУЧШЕННЫЕ СООБЩЕНИЯ ========== */
@@ -173,19 +396,6 @@
             gap: 2px;
         }
         
-        .message .read-status.sent::before {
-            content: "✓";
-        }
-        
-        .message .read-status.delivered::before {
-            content: "✓✓";
-        }
-        
-        .message .read-status.read::before {
-            content: "✓✓";
-            color: #34c759;
-        }
-        
         .message-time {
             font-size: 9px;
             margin-top: 4px;
@@ -214,10 +424,6 @@
                 opacity: 1;
                 transform: translateY(0);
             }
-        }
-        
-        .message.new-message {
-            animation: fadeSlideUp 0.3s ease;
         }
         
         .header {
@@ -1445,7 +1651,6 @@
         let sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
         let searchTimeout = null;
         let currentSearchQuery = '';
-        let lastMessageId = null;
         
         // ========== ФУНКЦИЯ ОБНОВЛЕНИЯ ЗАГОЛОВКА ==========
         function updateCrmTitle(botName) {
@@ -1927,7 +2132,7 @@
             document.getElementById('utmHistoryModal').classList.remove('active');
         }
         
-        // ========== ЗАГРУЗКА СООБЩЕНИЙ С ЭФФЕКТАМИ ==========
+        // ========== ЗАГРУЗКА СООБЩЕНИЙ ==========
         async function loadMessages(chatId) {
             const res = await fetch(`/api/chats/${chatId}/messages`);
             const data = await res.json();
@@ -1936,10 +2141,6 @@
             if (!data.messages.length) {
                 container.innerHTML = '<div class="empty-state">Нет сообщений</div>';
                 return;
-            }
-            
-            if (data.messages.length > 0) {
-                lastMessageId = data.messages[data.messages.length - 1].id;
             }
             
             container.innerHTML = data.messages.map(msg => `
