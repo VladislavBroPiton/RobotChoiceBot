@@ -271,63 +271,36 @@ class Database:
                    utm_data.get('gclid'))
                 logger.info(f"✅ Created new user {user_id} with UTM: {utm_data}")
             
-            # Проверяем, нужно ли добавлять новую сессию (только для уникальных UTM)
+            # Проверяем, нужно ли добавлять новую сессию (проверка среди ВСЕХ сессий)
             should_add_session = False
             
-            if start_param:
-                # Получаем последнюю сессию пользователя
-                last_session = await conn.fetchrow('''
-                    SELECT utm_source, utm_medium, utm_campaign, utm_term, utm_content
-                    FROM user_sessions
-                    WHERE user_id = $1
-                    ORDER BY first_interaction DESC
-                    LIMIT 1
-                ''', user_id)
-                
-                # Если нет ни одной сессии — добавляем
-                if not last_session:
-                    should_add_session = True
+            # Проверяем, была ли уже ТОЧНО ТАКАЯ ЖЕ комбинация UTM
+            existing_session = await conn.fetchrow('''
+                SELECT id FROM user_sessions 
+                WHERE user_id = $1 
+                AND COALESCE(utm_source, '') = $2
+                AND COALESCE(utm_medium, '') = $3
+                AND COALESCE(utm_campaign, '') = $4
+                AND COALESCE(utm_term, '') = $5
+                AND COALESCE(utm_content, '') = $6
+                LIMIT 1
+            ''', user_id,
+               utm_data.get('utm_source', ''),
+               utm_data.get('utm_medium', ''),
+               utm_data.get('utm_campaign', ''),
+               utm_data.get('utm_term', ''),
+               utm_data.get('utm_content', ''))
+            
+            if not existing_session:
+                should_add_session = True
+                if any([utm_data.get('utm_source'), utm_data.get('utm_medium'), 
+                        utm_data.get('utm_campaign'), utm_data.get('utm_term'), 
+                        utm_data.get('utm_content')]):
+                    logger.info(f"📊 New unique UTM combination for user {user_id}: {utm_data}")
                 else:
-                    # Сравниваем текущие UTM с последней сессией
-                    current_utm = (
-                        utm_data.get('utm_source') or '',
-                        utm_data.get('utm_medium') or '',
-                        utm_data.get('utm_campaign') or '',
-                        utm_data.get('utm_term') or '',
-                        utm_data.get('utm_content') or ''
-                    )
-                    last_utm = (
-                        last_session['utm_source'] or '',
-                        last_session['utm_medium'] or '',
-                        last_session['utm_campaign'] or '',
-                        last_session['utm_term'] or '',
-                        last_session['utm_content'] or ''
-                    )
-                    
-                    # Добавляем сессию только если UTM отличаются
-                    if current_utm != last_utm:
-                        should_add_session = True
-                        logger.info(f"📊 New unique UTM for user {user_id}: {utm_data}")
-                    else:
-                        logger.info(f"⏭️ Skipping duplicate UTM for user {user_id}: {utm_data}")
-            else:
-                # Нет UTM-меток — проверяем, была ли уже сессия без меток
-                session_without_utm = await conn.fetchrow('''
-                    SELECT id FROM user_sessions
-                    WHERE user_id = $1 
-                    AND (utm_source IS NULL OR utm_source = '')
-                    AND (utm_medium IS NULL OR utm_medium = '')
-                    AND (utm_campaign IS NULL OR utm_campaign = '')
-                    AND (utm_term IS NULL OR utm_term = '')
-                    AND (utm_content IS NULL OR utm_content = '')
-                    LIMIT 1
-                ''', user_id)
-                
-                if not session_without_utm:
-                    should_add_session = True
                     logger.info(f"📊 First visit without UTM for user {user_id}")
-                else:
-                    logger.info(f"⏭️ Skipping duplicate visit without UTM for user {user_id}")
+            else:
+                logger.info(f"⏭️ Skipping duplicate UTM for user {user_id}: {utm_data}")
             
             # Добавляем сессию если нужно
             if should_add_session:
