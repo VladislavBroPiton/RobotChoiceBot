@@ -43,29 +43,59 @@ storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+import json
+
 def parse_utm_from_start_param(start_param: str) -> dict:
-    """Парсит UTM-метки из параметра start"""
+    """Парсит UTM-метки из параметра start (поддерживает JSON формат)"""
     if not start_param:
         return {}
     
     utm_data = {}
     
-    if '?' in start_param:
-        base, query = start_param.split('?', 1)
-        utm_data['start_param'] = base
+    # Пробуем распарсить как JSON
+    try:
+        # Декодируем URL-encoded строку если есть
+        import urllib.parse
+        decoded = urllib.parse.unquote(start_param)
         
-        for param in query.split('&'):
-            if '=' in param:
-                key, value = param.split('=', 1)
-                if key.startswith('utm_'):
-                    utm_data[key] = value
-                elif key == 'ref':
-                    utm_data['referrer'] = value
-                elif key == 'gclid':
-                    utm_data['gclid'] = value
-    else:
-        utm_data['start_param'] = start_param
+        # Пробуем найти JSON объект
+        if decoded.startswith('{') and decoded.endswith('}'):
+            data = json.loads(decoded)
+            utm_data['start_param'] = data.get('id', data.get('start_param', ''))
+            
+            # Извлекаем UTM-параметры
+            for key in ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']:
+                if key in data:
+                    utm_data[key] = data[key]
+            
+            # Извлекаем дополнительные параметры
+            if 'ref' in data:
+                utm_data['referrer'] = data['ref']
+            if 'gclid' in data:
+                utm_data['gclid'] = data['gclid']
+            
+            return utm_data
+    except:
+        pass
     
+    # Старый формат (через & или ?) - оставляем для совместимости
+    if '&' in start_param or '?' in start_param:
+        parts = start_param.split('&', 1) if '&' in start_param else start_param.split('?', 1)
+        utm_data['start_param'] = parts[0]
+        
+        if len(parts) > 1:
+            for param in parts[1].split('&'):
+                if '=' in param:
+                    key, value = param.split('=', 1)
+                    if key.startswith('utm_'):
+                        utm_data[key] = value
+                    elif key == 'ref':
+                        utm_data['referrer'] = value
+                    elif key == 'gclid':
+                        utm_data['gclid'] = value
+        return utm_data
+    
+    utm_data['start_param'] = start_param
     return utm_data
 
 # ==================== БАЗА ДАННЫХ ====================
