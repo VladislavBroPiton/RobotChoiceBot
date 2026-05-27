@@ -95,7 +95,7 @@ class Database:
             await conn.execute('''
                 INSERT INTO bot_instances (name, bot_token) 
                 VALUES ('RobotChoiceBot', $1)
-                ON CONFLICT DO NOTHING
+                ON CONFLICT (name) DO NOTHING
             ''', DEFAULT_BOT_TOKEN)
             
             # Таблица пользователей
@@ -109,7 +109,7 @@ class Database:
                 )
             ''')
             
-            # Добавляем колонки (если их нет)
+            # Добавляем колонки в users (если их нет)
             await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
             await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_source TEXT')
             await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_medium TEXT')
@@ -125,7 +125,6 @@ class Database:
                 CREATE TABLE IF NOT EXISTS chats (
                     id SERIAL PRIMARY KEY,
                     user_id BIGINT REFERENCES users(user_id),
-                    bot_id INTEGER REFERENCES bot_instances(id),
                     dialog_status TEXT DEFAULT 'первое сообщение',
                     auto_mode BOOLEAN DEFAULT TRUE,
                     is_blocked BOOLEAN DEFAULT FALSE,
@@ -134,6 +133,9 @@ class Database:
                     last_message_at TIMESTAMP DEFAULT NOW()
                 )
             ''')
+            
+            # Добавляем колонку bot_id в таблицу chats (если её нет)
+            await conn.execute('ALTER TABLE chats ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
             
             # Таблица сообщений
             await conn.execute('''
@@ -152,7 +154,6 @@ class Database:
                 CREATE TABLE IF NOT EXISTS user_sessions (
                     id SERIAL PRIMARY KEY,
                     user_id BIGINT REFERENCES users(user_id),
-                    bot_id INTEGER REFERENCES bot_instances(id),
                     utm_source TEXT,
                     utm_medium TEXT,
                     utm_campaign TEXT,
@@ -166,11 +167,13 @@ class Database:
                 )
             ''')
             
+            # Добавляем колонку bot_id в user_sessions (если её нет)
+            await conn.execute('ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
+            
             # Таблица статистики
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS crm_stats (
                     id SERIAL PRIMARY KEY,
-                    bot_id INTEGER REFERENCES bot_instances(id),
                     date DATE UNIQUE,
                     new_chats INTEGER DEFAULT 0,
                     active_chats INTEGER DEFAULT 0,
@@ -178,6 +181,9 @@ class Database:
                     avg_response_time INTEGER DEFAULT 0
                 )
             ''')
+            
+            # Добавляем колонку bot_id в crm_stats (если её нет)
+            await conn.execute('ALTER TABLE crm_stats ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
             
             # Создаём индексы (ТОЛЬКО ПОСЛЕ того, как колонки существуют)
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_bot_id ON users(bot_id)')
