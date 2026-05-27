@@ -35,6 +35,32 @@ DATABASE_URL = "postgresql://neondb_owner:npg_ZS6yvHDEwa1G@ep-winter-dust-al1pbd
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+def parse_utm_from_start_param(start_param: str) -> dict:
+    """Парсит UTM-метки из параметра start"""
+    if not start_param:
+        return {}
+    
+    utm_data = {}
+    
+    if '?' in start_param:
+        base, query = start_param.split('?', 1)
+        utm_data['start_param'] = base
+        
+        for param in query.split('&'):
+            if '=' in param:
+                key, value = param.split('=', 1)
+                if key.startswith('utm_'):
+                    utm_data[key] = value
+                elif key == 'ref':
+                    utm_data['referrer'] = value
+                elif key == 'gclid':
+                    utm_data['gclid'] = value
+    else:
+        utm_data['start_param'] = start_param
+    
+    return utm_data
+
 # ==================== БАЗА ДАННЫХ ====================
 class Database:
     def __init__(self):
@@ -54,9 +80,18 @@ class Database:
                     username TEXT,
                     full_name TEXT,
                     first_seen TIMESTAMP DEFAULT NOW(),
-                    last_active TIMESTAMP DEFAULT NOW()
+                    last_active TIMESTAMP DEFAULT NOW(),
+                    utm_source TEXT,
+                    utm_medium TEXT,
+                    utm_campaign TEXT,
+                    utm_content TEXT,
+                    utm_term TEXT,
+                    referrer TEXT,
+                    start_param TEXT,
+                    gclid TEXT
                 )
             ''')
+            
             # Таблица чатов (диалогов)
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS chats (
@@ -70,6 +105,7 @@ class Database:
                     last_message_at TIMESTAMP DEFAULT NOW()
                 )
             ''')
+            
             # Таблица сообщений
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS messages (
@@ -81,6 +117,25 @@ class Database:
                     timestamp TIMESTAMP DEFAULT NOW()
                 )
             ''')
+            
+            # Таблица для хранения истории UTM-меток (по сессиям)
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS user_sessions (
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT REFERENCES users(user_id),
+                    utm_source TEXT,
+                    utm_medium TEXT,
+                    utm_campaign TEXT,
+                    utm_content TEXT,
+                    utm_term TEXT,
+                    referrer TEXT,
+                    start_param TEXT,
+                    gclid TEXT,
+                    first_interaction TIMESTAMP DEFAULT NOW(),
+                    last_interaction TIMESTAMP DEFAULT NOW()
+                )
+            ''')
+            
             # Таблица статистики (для отчётов)
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS crm_stats (
@@ -92,22 +147,52 @@ class Database:
                     avg_response_time INTEGER DEFAULT 0
                 )
             ''')
+            
+            # Создаём индексы для быстрого поиска по UTM
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_source ON users(utm_source)')
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_campaign ON users(utm_campaign)')
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON user_sessions(user_id)')
+            
             logger.info("✅ Таблицы созданы")
 
-    async def get_or_create_chat(self, user_id: int, username: str = None, full_name: str = None):
+    async def get_or_create_chat(self, user_id: int, username: str = None, 
+                                  full_name: str = None, start_param: str = None):
         async with self.pool.acquire() as conn:
-            # Добавляем/обновляем пользователя
+            # Парсим UTM из start_param
+            utm_data = parse_utm_from_start_param(start_param)
+            
+            # Добавляем/обновляем пользователя с UTM-метками
             await conn.execute('''
-                INSERT INTO users (user_id, username, full_name)
-                VALUES ($1, $2, $3)
+                INSERT INTO users (user_id, username, full_name, 
+                                   utm_source, utm_medium, utm_campaign, 
+                                   utm_content, utm_term, referrer, start_param, gclid)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 ON CONFLICT (user_id) DO UPDATE
-                SET username = EXCLUDED.username, last_active = NOW()
-            ''', user_id, username, full_name)
+                SET username = EXCLUDED.username, 
+                    full_name = EXCLUDED.full_name,
+                    last_active = NOW()
+            ''', user_id, username, full_name,
+               utm_data.get('utm_source'), utm_data.get('utm_medium'),
+               utm_data.get('utm_campaign'), utm_data.get('utm_content'),
+               utm_data.get('utm_term'), utm_data.get('referrer'),
+               utm_data.get('start_param', start_param),
+               utm_data.get('gclid'))
+            
+            # Создаём запись о сессии
+            await conn.execute('''
+                INSERT INTO user_sessions (user_id, utm_source, utm_medium, 
+                                           utm_campaign, utm_content, utm_term, 
+                                           referrer, start_param, gclid)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ''', user_id,
+               utm_data.get('utm_source'), utm_data.get('utm_medium'),
+               utm_data.get('utm_campaign'), utm_data.get('utm_content'),
+               utm_data.get('utm_term'), utm_data.get('referrer'),
+               utm_data.get('start_param', start_param),
+               utm_data.get('gclid'))
             
             # Получаем или создаём чат
-            row = await conn.fetchrow('''
-                SELECT * FROM chats WHERE user_id = $1
-            ''', user_id)
+            row = await conn.fetchrow('SELECT * FROM chats WHERE user_id = $1', user_id)
             if row:
                 return dict(row)
             else:
@@ -141,7 +226,7 @@ class Database:
     async def get_all_chats(self, limit: int = 50, offset: int = 0, status_filter: str = None):
         async with self.pool.acquire() as conn:
             query = '''
-                SELECT c.*, u.username, u.full_name 
+                SELECT c.*, u.username, u.full_name, u.utm_source, u.utm_campaign
                 FROM chats c
                 JOIN users u ON c.user_id = u.user_id
                 WHERE c.is_blocked = FALSE
@@ -170,12 +255,60 @@ class Database:
     async def get_chat_by_id(self, chat_id: int):
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('''
-                SELECT c.*, u.username, u.full_name 
+                SELECT c.*, u.username, u.full_name, u.utm_source, u.utm_campaign, u.utm_medium
                 FROM chats c
                 JOIN users u ON c.user_id = u.user_id
                 WHERE c.id = $1
             ''', chat_id)
             return dict(row) if row else None
+    
+    async def get_utm_stats(self):
+        """Получить статистику по UTM-меткам"""
+        async with self.pool.acquire() as conn:
+            # Общая статистика по UTM-источникам
+            sources = await conn.fetch('''
+                SELECT utm_source, COUNT(*) as count 
+                FROM users 
+                WHERE utm_source IS NOT NULL 
+                GROUP BY utm_source 
+                ORDER BY count DESC
+            ''')
+            
+            # Статистика по кампаниям
+            campaigns = await conn.fetch('''
+                SELECT utm_campaign, COUNT(*) as count 
+                FROM users 
+                WHERE utm_campaign IS NOT NULL 
+                GROUP BY utm_campaign 
+                ORDER BY count DESC
+            ''')
+            
+            # Конверсии по UTM (пользователи, дошедшие до контакта с менеджером)
+            conversions = await conn.fetch('''
+                SELECT u.utm_source, COUNT(DISTINCT u.user_id) as count
+                FROM users u
+                JOIN chats c ON u.user_id = c.user_id
+                WHERE (c.dialog_status = 'ожидание менеджера' OR c.dialog_status = 'в работе')
+                  AND u.utm_source IS NOT NULL
+                GROUP BY u.utm_source
+                ORDER BY count DESC
+            ''')
+            
+            # Динамика по дням (новые пользователи по источникам)
+            daily = await conn.fetch('''
+                SELECT DATE(first_seen) as date, utm_source, COUNT(*) as count
+                FROM users
+                WHERE utm_source IS NOT NULL AND first_seen > NOW() - INTERVAL '30 days'
+                GROUP BY DATE(first_seen), utm_source
+                ORDER BY date DESC
+            ''')
+            
+            return {
+                "sources": [dict(r) for r in sources],
+                "campaigns": [dict(r) for r in campaigns],
+                "conversions": [dict(r) for r in conversions],
+                "daily": [{"date": r['date'].isoformat(), "source": r['utm_source'], "count": r['count']} for r in daily]
+            }
 
 # ==================== БОТ ====================
 db = Database()
@@ -190,7 +323,20 @@ class Form(StatesGroup):
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user = message.from_user
-    chat_data = await db.get_or_create_chat(user.id, user.username, user.full_name)
+    # Получаем start_param (если есть)
+    start_param = message.text.replace('/start', '').strip()
+    if start_param.startswith(' '):
+        start_param = start_param[1:]
+    if start_param == '':
+        start_param = None
+    
+    chat_data = await db.get_or_create_chat(
+        user.id, user.username, user.full_name, start_param
+    )
+    
+    # Если есть UTM-метки, логируем
+    if start_param:
+        logger.info(f"New user {user.id} from: {start_param}")
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📊 Посмотреть услуги", callback_data="services")],
@@ -406,7 +552,6 @@ async def send_message(chat_id: int, request: Request):
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     
-    # Отправляем сообщение в Telegram
     try:
         await bot.send_message(chat['user_id'], message_text)
         await db.save_message(chat_id, 'operator', message_text)
@@ -436,6 +581,13 @@ async def mark_read(chat_id: int):
     """Отметить чат как прочитанный"""
     return {"status": "ok"}
 
+# ==================== UTM СТАТИСТИКА ====================
+@app.get("/api/utm_stats")
+async def get_utm_stats():
+    """Получить статистику по UTM-меткам"""
+    stats = await db.get_utm_stats()
+    return stats
+
 # ==================== ЭКСПОРТ CSV ====================
 @app.get("/api/export/csv")
 async def export_csv(chat_id: int = None):
@@ -445,7 +597,7 @@ async def export_csv(chat_id: int = None):
     
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(["ID чата", "ID пользователя", "Имя", "Статус", "Авторежим", "Дата создания", "Последнее сообщение"])
+    writer.writerow(["ID чата", "ID пользователя", "Имя", "Статус", "Авторежим", "UTM Source", "UTM Campaign", "Дата создания", "Последнее сообщение"])
     
     if chat_id:
         chat = await db.get_chat_by_id(chat_id)
@@ -453,6 +605,7 @@ async def export_csv(chat_id: int = None):
             writer.writerow([
                 chat['id'], chat['user_id'], chat.get('full_name', ''),
                 chat.get('dialog_status', ''), chat.get('auto_mode', ''),
+                chat.get('utm_source', ''), chat.get('utm_campaign', ''),
                 chat.get('created_at', ''), chat.get('last_message_at', '')
             ])
     else:
@@ -461,6 +614,7 @@ async def export_csv(chat_id: int = None):
             writer.writerow([
                 chat['id'], chat['user_id'], chat.get('full_name', ''),
                 chat.get('dialog_status', ''), chat.get('auto_mode', ''),
+                chat.get('utm_source', ''), chat.get('utm_campaign', ''),
                 chat.get('created_at', ''), chat.get('last_message_at', '')
             ])
     
@@ -484,12 +638,10 @@ async def export_pdf(chat_id: int = None):
     styles = getSampleStyleSheet()
     story = []
     
-    # Заголовок
     title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#2b5278'))
     story.append(Paragraph("RobotChoiceBot CRM - Отчёт по чатам", title_style))
     story.append(Spacer(1, 0.2*inch))
     
-    # Получаем данные
     if chat_id:
         chat = await db.get_chat_by_id(chat_id)
         data = [[chat['id'], chat['user_id'], chat.get('full_name', ''), chat.get('dialog_status', '')]]
@@ -497,7 +649,6 @@ async def export_pdf(chat_id: int = None):
         chats = await db.get_all_chats(limit=500)
         data = [[c['id'], c['user_id'], c.get('full_name', ''), c.get('dialog_status', '')] for c in chats]
     
-    # Таблица
     table = Table([["ID чата", "ID пользователя", "Имя", "Статус"]] + data)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.grey),
@@ -519,38 +670,6 @@ async def export_pdf(chat_id: int = None):
     )
     return response
 
-# ==================== ВЕБ-ДАШБОРД ====================
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
-
-# ==================== ШАБЛОНЫ ОТВЕТОВ ====================
-templates_storage = []
-
-@app.get("/api/templates")
-async def get_templates():
-    """Получить список шаблонов"""
-    return {"templates": templates_storage}
-
-@app.post("/api/templates")
-async def create_template(request: Request):
-    """Создать новый шаблон"""
-    data = await request.json()
-    title = data.get("title")
-    text = data.get("text")
-    
-    if not title or not text:
-        raise HTTPException(status_code=400, detail="Title and text are required")
-    
-    template_id = len(templates_storage) + 1
-    templates_storage.append({
-        "id": template_id,
-        "title": title,
-        "text": text,
-        "created_at": datetime.now().isoformat()
-    })
-    return {"id": template_id, "title": title, "text": text}
-
 # ==================== ЭКСПОРТ ПО ПЕРИОДУ ====================
 @app.get("/api/export/period")
 async def export_period(from_date: str, to_date: str):
@@ -566,7 +685,7 @@ async def export_period(from_date: str, to_date: str):
     
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(["ID чата", "ID пользователя", "Имя", "Статус", "Авторежим", "Создан", "Последнее сообщение"])
+    writer.writerow(["ID чата", "ID пользователя", "Имя", "Статус", "Авторежим", "UTM Source", "UTM Campaign", "Создан", "Последнее сообщение"])
     
     chats = await db.get_all_chats(limit=5000)
     filtered_chats = []
@@ -586,6 +705,7 @@ async def export_period(from_date: str, to_date: str):
         writer.writerow([
             chat['id'], chat['user_id'], chat.get('full_name', ''),
             chat.get('dialog_status', ''), chat.get('auto_mode', ''),
+            chat.get('utm_source', ''), chat.get('utm_campaign', ''),
             chat.get('created_at', ''), chat.get('last_message_at', '')
         ])
     
@@ -595,6 +715,11 @@ async def export_period(from_date: str, to_date: str):
         headers={"Content-Disposition": f"attachment; filename=chats_{from_date}_{to_date}.csv"}
     )
     return response
+
+# ==================== ВЕБ-ДАШБОРД ====================
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 # ==================== ЗАПУСК ====================
 if __name__ == "__main__":
