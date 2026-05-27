@@ -84,19 +84,31 @@ class Database:
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS bot_instances (
                     id SERIAL PRIMARY KEY,
-                    name TEXT NOT NULL UNIQUE,
+                    name TEXT NOT NULL,
                     bot_token TEXT NOT NULL,
                     is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT NOW()
                 )
             ''')
             
-            # Добавляем ботов по умолчанию, если их нет
+            # Удаляем дубликаты ботов (оставляем только первого)
             await conn.execute('''
-                INSERT INTO bot_instances (name, bot_token) 
-                SELECT 'RobotChoiceBot', $1
-                WHERE NOT EXISTS (SELECT 1 FROM bot_instances WHERE name = 'RobotChoiceBot')
-            ''', DEFAULT_BOT_TOKEN)
+                DELETE FROM bot_instances 
+                WHERE id NOT IN (SELECT MIN(id) FROM bot_instances GROUP BY name)
+            ''')
+            
+            # Добавляем бота по умолчанию, если нет ни одного
+            row = await conn.fetchrow('SELECT COUNT(*) FROM bot_instances')
+            if row['count'] == 0:
+                await conn.execute('''
+                    INSERT INTO bot_instances (name, bot_token, is_active)
+                    VALUES ('RobotChoiceBot', $1, TRUE)
+                ''', DEFAULT_BOT_TOKEN)
+            else:
+                # Если бот уже есть, но ни один не активен, активируем первого
+                active = await conn.fetchval('SELECT COUNT(*) FROM bot_instances WHERE is_active = TRUE')
+                if active == 0:
+                    await conn.execute('UPDATE bot_instances SET is_active = TRUE ORDER BY id LIMIT 1')
             
             # Таблица пользователей
             await conn.execute('''
@@ -136,6 +148,12 @@ class Database:
             
             # Добавляем колонку bot_id в таблицу chats (если её нет)
             await conn.execute('ALTER TABLE chats ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
+            
+            # Обновляем существующие чаты (устанавливаем bot_id для старых записей)
+            active_bot = await conn.fetchrow('SELECT id FROM bot_instances WHERE is_active = TRUE LIMIT 1')
+            if active_bot:
+                await conn.execute('UPDATE chats SET bot_id = $1 WHERE bot_id IS NULL', active_bot['id'])
+                await conn.execute('UPDATE users SET bot_id = $1 WHERE bot_id IS NULL', active_bot['id'])
             
             # Таблица сообщений
             await conn.execute('''
