@@ -168,11 +168,12 @@ class Database:
                 )
             ''')
             
-            # Таблица для хранения истории UTM-меток
+            # Таблица для хранения истории UTM-меток (ВСЕ визиты)
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS user_sessions (
                     id SERIAL PRIMARY KEY,
                     user_id BIGINT REFERENCES users(user_id),
+                    bot_id INTEGER REFERENCES bot_instances(id),
                     utm_source TEXT,
                     utm_medium TEXT,
                     utm_campaign TEXT,
@@ -185,9 +186,6 @@ class Database:
                     last_interaction TIMESTAMP DEFAULT NOW()
                 )
             ''')
-            
-            # Добавляем колонку bot_id в user_sessions (если её нет)
-            await conn.execute('ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
             
             # Таблица статистики
             await conn.execute('''
@@ -204,11 +202,13 @@ class Database:
             # Добавляем колонку bot_id в crm_stats (если её нет)
             await conn.execute('ALTER TABLE crm_stats ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
             
-            # Создаём индексы (ТОЛЬКО ПОСЛЕ того, как колонки существуют)
+            # Создаём индексы
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_bot_id ON users(bot_id)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_chats_bot_id ON chats(bot_id)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_source ON users(utm_source)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_campaign ON users(utm_campaign)')
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON user_sessions(user_id)')
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_sessions_created ON user_sessions(first_interaction)')
             
             logger.info("✅ Таблицы созданы")
 
@@ -242,41 +242,53 @@ class Database:
             utm_data = parse_utm_from_start_param(start_param)
             logger.info(f"📊 Parsed UTM for user {user_id}: {utm_data}")
             
-            # Сохраняем или обновляем пользователя с UTM-метками
-            await conn.execute('''
-                INSERT INTO users (user_id, username, full_name, bot_id,
-                                   utm_source, utm_medium, utm_campaign, 
-                                   utm_content, utm_term, referrer, start_param, gclid)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                ON CONFLICT (user_id) DO UPDATE
-                SET username = EXCLUDED.username, 
-                    full_name = EXCLUDED.full_name,
-                    last_active = NOW()
-            ''', user_id, username, full_name, bot_id,
-               utm_data.get('utm_source'),
-               utm_data.get('utm_medium'),
-               utm_data.get('utm_campaign'),
-               utm_data.get('utm_content'),
-               utm_data.get('utm_term'),
-               utm_data.get('referrer'),
-               utm_data.get('start_param', start_param),
-               utm_data.get('gclid'))
+            # Проверяем, существует ли пользователь
+            existing_user = await conn.fetchrow('SELECT user_id FROM users WHERE user_id = $1', user_id)
             
-            # Сохраняем сессию с UTM
-            await conn.execute('''
-                INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
-                                           utm_campaign, utm_content, utm_term, 
-                                           referrer, start_param, gclid)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            ''', user_id, bot_id,
-               utm_data.get('utm_source'),
-               utm_data.get('utm_medium'),
-               utm_data.get('utm_campaign'),
-               utm_data.get('utm_content'),
-               utm_data.get('utm_term'),
-               utm_data.get('referrer'),
-               utm_data.get('start_param', start_param),
-               utm_data.get('gclid'))
+            if existing_user:
+                # Пользователь существует — обновляем только активность и username
+                await conn.execute('''
+                    UPDATE users 
+                    SET username = $1, full_name = $2, last_active = NOW()
+                    WHERE user_id = $3
+                ''', username, full_name, user_id)
+                logger.info(f"🔄 Updated existing user {user_id}")
+            else:
+                # Новый пользователь — сохраняем с первыми UTM
+                await conn.execute('''
+                    INSERT INTO users (user_id, username, full_name, bot_id,
+                                       utm_source, utm_medium, utm_campaign, 
+                                       utm_content, utm_term, referrer, start_param, gclid)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                ''', user_id, username, full_name, bot_id,
+                   utm_data.get('utm_source'),
+                   utm_data.get('utm_medium'),
+                   utm_data.get('utm_campaign'),
+                   utm_data.get('utm_content'),
+                   utm_data.get('utm_term'),
+                   utm_data.get('referrer'),
+                   utm_data.get('start_param', start_param),
+                   utm_data.get('gclid'))
+                logger.info(f"✅ Created new user {user_id} with UTM: {utm_data}")
+            
+            # ВСЕГДА добавляем новую сессию с UTM (для аналитики истории)
+            # Это сохраняет каждый визит пользователя с разными UTM-метками
+            if start_param:  # Сохраняем сессию только если есть параметры
+                await conn.execute('''
+                    INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
+                                               utm_campaign, utm_content, utm_term, 
+                                               referrer, start_param, gclid)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                ''', user_id, bot_id,
+                   utm_data.get('utm_source'),
+                   utm_data.get('utm_medium'),
+                   utm_data.get('utm_campaign'),
+                   utm_data.get('utm_content'),
+                   utm_data.get('utm_term'),
+                   utm_data.get('referrer'),
+                   utm_data.get('start_param', start_param),
+                   utm_data.get('gclid'))
+                logger.info(f"📊 Added new session for user {user_id} with start_param: {start_param}")
             
             # Получаем или создаём чат
             row = await conn.fetchrow('SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2', user_id, bot_id)
@@ -288,6 +300,7 @@ class Database:
                     VALUES ($1, $2)
                     RETURNING *
                 ''', user_id, bot_id)
+                logger.info(f"💬 Created new chat for user {user_id}")
                 return dict(row)
 
     async def save_message(self, chat_id: int, sender_type: str, message_text: str = None, file_id: str = None):
@@ -372,7 +385,7 @@ class Database:
             return [dict(r) for r in rows]
 
     async def get_chat_with_utm(self, chat_id: int):
-        """Получить чат с полными UTM-метками пользователя"""
+        """Получить чат с полными UTM-метками пользователя (первые UTM)"""
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('''
                 SELECT c.*, u.username, u.full_name, u.user_id,
@@ -383,6 +396,18 @@ class Database:
                 WHERE c.id = $1
             ''', chat_id)
             return dict(row) if row else None
+    
+    async def get_user_sessions(self, user_id: int):
+        """Получить историю всех UTM-сессий пользователя"""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('''
+                SELECT utm_source, utm_medium, utm_campaign, utm_term, utm_content,
+                       referrer, start_param, gclid, first_interaction
+                FROM user_sessions
+                WHERE user_id = $1
+                ORDER BY first_interaction DESC
+            ''', user_id)
+            return [dict(r) for r in rows]
 
     async def update_dialog_status(self, chat_id: int, status: str):
         async with self.pool.acquire() as conn:
@@ -687,11 +712,17 @@ async def get_chat(chat_id: int):
 
 @app.get("/api/chats/{chat_id}/full")
 async def get_chat_full(chat_id: int):
-    """Получить чат с полными UTM-метками"""
+    """Получить чат с полными UTM-метками пользователя (первые UTM)"""
     chat = await db.get_chat_with_utm(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     return chat
+
+@app.get("/api/users/{user_id}/sessions")
+async def get_user_sessions(user_id: int):
+    """Получить историю всех UTM-сессий пользователя"""
+    sessions = await db.get_user_sessions(user_id)
+    return {"sessions": sessions}
 
 @app.get("/api/chats/{chat_id}/messages")
 async def get_messages(chat_id: int, limit: int = 100):
