@@ -532,9 +532,27 @@ async function resendMessage(messageId, text) {
 }
 
 async function deleteMessage(messageId) {
-    if (confirm('Удалить это сообщение?')) {
-        showToast('🗑 Сообщение удалено');
-        if (currentChatId) loadMessagesSmart(currentChatId);
+    // Даём браузеру завершить текущий клик
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    if (!confirm('Удалить это сообщение?')) return;
+    
+    try {
+        const res = await fetch(`/api/messages/${messageId}/delete`, {
+            method: 'POST'
+        });
+        
+        if (res.ok) {
+            showToast('🗑 Сообщение удалено');
+            lastMessageCount = 0;
+            lastMessageId = null;
+            if (currentChatId) await loadMessagesSmart(currentChatId);
+        } else {
+            showToast('❌ Ошибка удаления сообщения');
+        }
+    } catch(e) {
+        console.error('Error deleting message:', e);
+        showToast('❌ Ошибка удаления сообщения');
     }
 }
 
@@ -1010,7 +1028,7 @@ function renderTemplatesList() {
         return;
     }
     container.innerHTML = templates.map(tpl => `
-        <div class="template-item" onclick="useTemplate(${tpl.id})">
+        <div class="template-item" onclick="useTemplate(${tpl.id})" title="Нажмите, чтобы использовать шаблон">
             <div class="template-title">${escapeHtml(tpl.title)}</div>
             <div class="template-text">${escapeHtml(tpl.text.substring(0, 100))}${tpl.text.length > 100 ? '...' : ''}</div>
         </div>
