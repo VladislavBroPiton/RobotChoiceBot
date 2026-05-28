@@ -48,6 +48,10 @@ bot = Bot(token=current_bot_token) if current_bot_token else None
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
+# Флаг для остановки polling
+polling_task = None
+is_polling_running = False
+
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def parse_utm_from_start_param(start_param: str) -> dict:
     """Парсит UTM-метки из параметра start (формат: id__source__medium__campaign__term__content)"""
@@ -509,20 +513,35 @@ class Database:
 db = Database()
 
 async def update_bot_instance(new_token: str, new_name: str):
-    global bot, dp, current_bot_token, current_bot_name
-    # Закрываем старого бота если он существует
-    if bot and not bot.session.closed:
+    global bot, dp, current_bot_token, current_bot_name, polling_task, is_polling_running
+    # Останавливаем текущий polling если он запущен
+    if polling_task and not polling_task.done():
+        is_polling_running = False
         try:
             await bot.delete_webhook()
             await bot.session.close()
         except:
             pass
+        polling_task.cancel()
+        try:
+            await polling_task
+        except asyncio.CancelledError:
+            pass
+    
     current_bot_token = new_token
     current_bot_name = new_name
     bot = Bot(token=current_bot_token)
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers()
-    logger.info(f"✅ Бот переключён на: {current_bot_name}")
+    
+    # Запускаем новый polling
+    is_polling_running = True
+    async def run_polling():
+        await bot.delete_webhook(drop_pending_updates=True)
+        await dp.start_polling(bot)
+    
+    polling_task = asyncio.create_task(run_polling())
+    logger.info(f"✅ Бот переключён на: {current_bot_name} и запущен polling")
 
 def register_handlers():
     @dp.message(Command("start"))
@@ -687,30 +706,37 @@ register_handlers()
 # ==================== API ДЛЯ CRM ====================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global polling_task, is_polling_running
     await db.connect()
     logger.info("✅ База данных подключена")
     
-    # Устанавливаем вебхук при старте
-    if bot:
-        webhook_url = f"https://robotchoicebot.onrender.com/webhook"
-        try:
-            # Сначала удаляем старые вебхуки с очисткой накопленных обновлений
-            await bot.delete_webhook(drop_pending_updates=True)
-            logger.info("✅ Старый вебхук удалён")
-            
-            # Устанавливаем новый вебхук
-            result = await bot.set_webhook(webhook_url)
-            if result:
-                logger.info(f"✅ Вебхук установлен: {webhook_url}")
-            else:
-                logger.error(f"❌ Ошибка установки вебхука")
-        except Exception as e:
-            logger.error(f"❌ Ошибка при установке вебхука: {e}")
+    # Запускаем polling для бота
+    if bot and not is_polling_running:
+        is_polling_running = True
+        async def run_polling():
+            try:
+                await bot.delete_webhook(drop_pending_updates=True)
+                logger.info("✅ Вебхук удалён, запускаем polling")
+                await dp.start_polling(bot)
+            except asyncio.CancelledError:
+                logger.info("Polling task cancelled")
+            except Exception as e:
+                logger.error(f"Polling error: {e}")
+        
+        polling_task = asyncio.create_task(run_polling())
+        logger.info("🤖 Бот запущен в режиме Long Polling")
     
     yield
     
     # Graceful shutdown
     logger.info("🔄 Shutting down...")
+    is_polling_running = False
+    if polling_task and not polling_task.done():
+        polling_task.cancel()
+        try:
+            await polling_task
+        except asyncio.CancelledError:
+            pass
     if bot:
         try:
             await bot.delete_webhook()
@@ -737,12 +763,11 @@ templates = Jinja2Templates(directory="templates")
 async def root():
     return RedirectResponse(url="/dashboard")
 
+# Эндпоинт вебхука больше не нужен для бота, но оставим для совместимости
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
-    update = await request.json()
-    telegram_update = types.Update(**update)
-    await dp.feed_webhook_update(bot, telegram_update)
-    return {"ok": True}
+    # Возвращаем ошибку, чтобы Telegram знал, что вебхук не используется
+    return {"ok": False, "description": "Webhook disabled, use polling"}
 
 @app.get("/health")
 async def health():
@@ -783,8 +808,8 @@ async def get_metrics():
         "memory": {
             "used_mb": round(memory_mb, 2),
             "percent": round(memory_percent, 2),
-            "limit_mb": 512,  # лимит бесплатного тарифа Render
-            "warning": memory_mb > 400  # предупреждение если >80% от 512MB
+            "limit_mb": 512,
+            "warning": memory_mb > 400
         },
         "uptime": {
             "seconds": round(uptime_seconds, 0),
@@ -795,7 +820,7 @@ async def get_metrics():
         },
         "bot": {
             "token_configured": bool(DEFAULT_BOT_TOKEN),
-            "webhook_configured": True  # будет обновляться при каждом запросе
+            "polling_active": is_polling_running
         }
     }
 
