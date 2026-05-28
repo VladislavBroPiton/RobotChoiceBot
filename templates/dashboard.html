@@ -143,6 +143,10 @@
     </div>
     
     <div id="utmTab" class="tab-content">
+        <div style="padding: 10px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px;">
+            <button onclick="switchTab('chats')" class="mobile-back-btn visible" style="display: inline-flex;" title="Вернуться к чатам">← Назад к чатам</button>
+            <strong style="color: var(--text-primary);">📊 UTM-статистика</strong>
+        </div>
         <div class="stats-container" id="utmStatsContainer">
             <div class="stats-card"><h3>📈 Источники трафика (utm_source)</h3><div id="utmSourcesList" class="stats-list"><div class="empty-state">Загрузка...</div></div></div>
             <div class="stats-card"><h3>🎯 Рекламные кампании (utm_campaign)</h3><div id="utmCampaignsList" class="stats-list"><div class="empty-state">Загрузка...</div></div></div>
