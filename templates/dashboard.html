@@ -538,6 +538,8 @@
             background: var(--bg-primary);
             height: 100vh;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
             transition: background 0.3s ease, color 0.2s ease;
         }
         
@@ -973,20 +975,18 @@
             border-color: var(--accent);
         }
         
-        .tab-content {
-            display: none;
-        }
-        
-        .tab-content.active {
+        .main-content {
             display: flex;
             flex: 1;
+            height: 100%;
             overflow: hidden;
-        }
+        }       
         
         .main-content {
             display: flex;
-            height: calc(100vh - 95px);
-            overflow: visible;
+            flex: 1;
+            height: 100%;
+            overflow: hidden;
         }
         
         .chats-sidebar {
@@ -1196,8 +1196,7 @@
             display: flex;
             flex-direction: column;
             background: var(--bg-primary);
-            overflow: visible;
-            position: relative;
+            min-width: 0;
         }
         
         .messages-header {
