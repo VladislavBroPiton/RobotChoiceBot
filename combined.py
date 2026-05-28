@@ -45,9 +45,8 @@ start_time = time.time()
 # Глобальные переменные для текущего бота
 current_bot_token = DEFAULT_BOT_TOKEN
 current_bot_name = "RobotChoiceBot"
-bot = None  # Будет создан после сброса соединений
-storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
+bot = None  # НЕ СОЗДАЁМ БОТА СРАЗУ!
+dp = None   # НЕ СОЗДАЁМ ДИСПЕТЧЕР СРАЗУ!
 
 # Флаг для остановки polling
 polling_task = None
@@ -101,16 +100,9 @@ def force_reset_telegram_connections():
         logger.error(f"❌ Failed to reset Telegram connections: {e}")
         return False
 
-# Вызываем ДО создания бота
+# Вызываем сброс ДО создания любых объектов aiogram
 logger.info("🚀 Initializing BotHub CRM...")
 force_reset_telegram_connections()
-
-# Создаём бота только после сброса старых соединений
-if DEFAULT_BOT_TOKEN:
-    bot = Bot(token=DEFAULT_BOT_TOKEN)
-    logger.info(f"🤖 Bot instance created for token: {DEFAULT_BOT_TOKEN[:10]}...")
-else:
-    logger.error("❌ BOT_TOKEN not found in environment variables!")
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def parse_utm_from_start_param(start_param: str) -> dict:
@@ -590,6 +582,19 @@ class Database:
 # ==================== БОТ ====================
 db = Database()
 
+# Функция для создания бота (вызывается только когда нужно)
+def create_bot_and_dispatcher():
+    global bot, dp
+    if not DEFAULT_BOT_TOKEN:
+        logger.error("❌ Cannot create bot: BOT_TOKEN not set")
+        return False
+    
+    bot = Bot(token=DEFAULT_BOT_TOKEN)
+    dp = Dispatcher(storage=MemoryStorage())
+    register_handlers()
+    logger.info(f"🤖 Bot instance created for token: {DEFAULT_BOT_TOKEN[:10]}...")
+    return True
+
 async def update_bot_instance(new_token: str, new_name: str):
     global bot, dp, current_bot_token, current_bot_name, polling_task, is_polling_running
     
@@ -614,15 +619,15 @@ async def update_bot_instance(new_token: str, new_name: str):
     current_bot_name = new_name
     
     # Принудительно сбрасываем соединения перед созданием нового бота
-    import requests as req
     try:
         url = f"https://api.telegram.org/bot{new_token}/deleteWebhook"
-        req.post(url, json={"drop_pending_updates": True}, timeout=10)
+        requests.post(url, json={"drop_pending_updates": True}, timeout=10)
         logger.info(f"✅ Webhook deleted for new bot: {new_name}")
         await asyncio.sleep(2)
     except Exception as e:
         logger.error(f"❌ Failed to reset connections for new bot: {e}")
     
+    # Создаём нового бота
     bot = Bot(token=current_bot_token)
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers()
@@ -807,12 +812,12 @@ def register_handlers():
                 except:
                     pass
 
-register_handlers()
+# НЕ ВЫЗЫВАЕМ register_handlers() здесь! Он будет вызван в create_bot_and_dispatcher()
 
 # ==================== API ДЛЯ CRM ====================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global polling_task, is_polling_running
+    global polling_task, is_polling_running, bot, dp
     
     # Увеличенная пауза для гарантированного завершения старых процессов
     logger.info("⏳ Waiting for old processes to terminate...")
@@ -821,9 +826,16 @@ async def lifespan(app: FastAPI):
     await db.connect()
     logger.info("✅ База данных подключена")
     
+    # СОЗДАЁМ БОТА ТОЛЬКО ЗДЕСЬ, после всех ожиданий
+    if not bot:
+        if create_bot_and_dispatcher():
+            logger.info("🤖 Bot created in lifespan")
+        else:
+            logger.error("❌ Failed to create bot in lifespan")
+    
     # Запускаем polling с дополнительной проверкой
     if bot and not is_polling_running:
-        # Ещё раз принудительно удаляем вебхук перед стартом
+        # Принудительно удаляем вебхук перед стартом
         try:
             await bot.delete_webhook(drop_pending_updates=True)
             logger.info("✅ Webhook deleted before polling start")
