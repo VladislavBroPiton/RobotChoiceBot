@@ -69,6 +69,12 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
 
 sys.excepthook = custom_excepthook
 
+# ВРЕМЕННЫЙ ФИКС: Убиваем все старые процессы при деплое
+import sys, os, signal
+logger.critical("🔴 KILLING PROCESS TO FORCE CLEAN RESTART")
+os.kill(os.getpid(), signal.SIGKILL)
+sys.exit(1)
+
 # ==================== ПРИНУДИТЕЛЬНЫЙ СБРОС СТАРЫХ СОЕДИНЕНИЙ ====================
 def force_reset_telegram_connections():
     """Принудительно закрывает все старые соединения бота с Telegram"""
