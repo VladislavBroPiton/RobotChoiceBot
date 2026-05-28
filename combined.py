@@ -363,6 +363,24 @@ class Database:
             ''', chat_id, limit)
             return [dict(r) for r in reversed(rows)]
 
+    async def get_client_message_count(self, chat_id: int) -> int:
+        """Получить количество последних сообщений подряд от клиента"""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch('''
+                SELECT sender_type FROM messages 
+                WHERE chat_id = $1 
+                ORDER BY timestamp DESC 
+                LIMIT 5
+            ''', chat_id)
+            
+            count = 0
+            for row in rows:
+                if row['sender_type'] == 'user':
+                    count += 1
+                else:
+                    break
+            return count
+
     async def get_all_chats(self, limit: int = 50, offset: int = 0, status_filter: str = None):
         async with self.pool.acquire() as conn:
             active_bot = await self.get_active_bot()
@@ -688,15 +706,20 @@ def register_handlers():
         await db.save_message(chat_data['id'], 'user', message.text, message.document.file_id if message.document else None)
         
         if chat_data['auto_mode']:
-            response = (
-                "✅ *Ваше сообщение получено!*\n\n"
-                "Менеджер скоро свяжется с вами. Ожидайте ответа в течение 15 минут.\n\n"
-                "А пока вы можете:\n"
-                "• Посмотреть наших роботов → /start\n"
-                "• Изучить статистику"
-            )
-            await message.answer(response, parse_mode="Markdown")
-            await db.save_message(chat_data['id'], 'bot', response)
+            # Получаем количество сообщений подряд от клиента
+            client_message_count = await db.get_client_message_count(chat_data['id'])
+            
+            # Отправляем ответ только после 3 сообщений подряд
+            if client_message_count >= 3:
+                response = (
+                    "✅ *Ваше сообщение получено!*\n\n"
+                    "Менеджер скоро свяжется с вами. Ожидайте ответа в течение 15 минут.\n\n"
+                    "А пока вы можете:\n"
+                    "• Посмотреть наших роботов → /start\n"
+                    "• Изучить статистику"
+                )
+                await message.answer(response, parse_mode="Markdown")
+                await db.save_message(chat_data['id'], 'bot', response)
         else:
             for admin_id in ADMIN_IDS:
                 try:
@@ -717,6 +740,10 @@ register_handlers()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global polling_task, is_polling_running
+    
+    # Небольшая пауза, чтобы старый процесс успел завершиться
+    await asyncio.sleep(2)
+    
     await db.connect()
     logger.info("✅ База данных подключена")
     
