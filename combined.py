@@ -514,14 +514,16 @@ db = Database()
 
 async def update_bot_instance(new_token: str, new_name: str):
     global bot, dp, current_bot_token, current_bot_name, polling_task, is_polling_running
+    
     # Останавливаем текущий polling если он запущен
     if polling_task and not polling_task.done():
         is_polling_running = False
-        try:
-            await bot.delete_webhook()
-            await bot.session.close()
-        except:
-            pass
+        if bot:
+            try:
+                await bot.delete_webhook()
+                await bot.session.close()
+            except:
+                pass
         polling_task.cancel()
         try:
             await polling_task
@@ -534,14 +536,22 @@ async def update_bot_instance(new_token: str, new_name: str):
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers()
     
-    # Запускаем новый polling
-    is_polling_running = True
-    async def run_polling():
-        await bot.delete_webhook(drop_pending_updates=True)
-        await dp.start_polling(bot)
+    # Перезапускаем polling с новым ботом
+    if is_polling_running:
+        async def run_polling():
+            try:
+                await bot.delete_webhook(drop_pending_updates=True)
+                logger.info("✅ Вебхук удалён, запускаем polling для нового бота")
+                await asyncio.sleep(1)
+                await dp.start_polling(bot)
+            except asyncio.CancelledError:
+                logger.info("Polling task cancelled")
+            except Exception as e:
+                logger.error(f"Polling error: {e}")
+        
+        polling_task = asyncio.create_task(run_polling())
     
-    polling_task = asyncio.create_task(run_polling())
-    logger.info(f"✅ Бот переключён на: {current_bot_name} и запущен polling")
+    logger.info(f"✅ Бот переключён на: {current_bot_name}")
 
 def register_handlers():
     @dp.message(Command("start"))
@@ -717,6 +727,7 @@ async def lifespan(app: FastAPI):
             try:
                 await bot.delete_webhook(drop_pending_updates=True)
                 logger.info("✅ Вебхук удалён, запускаем polling")
+                await asyncio.sleep(1)
                 await dp.start_polling(bot)
             except asyncio.CancelledError:
                 logger.info("Polling task cancelled")
@@ -766,7 +777,6 @@ async def root():
 # Эндпоинт вебхука больше не нужен для бота, но оставим для совместимости
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
-    # Возвращаем ошибку, чтобы Telegram знал, что вебхук не используется
     return {"ok": False, "description": "Webhook disabled, use polling"}
 
 @app.get("/health")
