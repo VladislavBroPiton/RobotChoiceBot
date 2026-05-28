@@ -3,6 +3,8 @@ import json
 import os
 import logging
 import signal
+import time
+import psutil
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
@@ -35,6 +37,9 @@ DATABASE_URL = "postgresql://neondb_owner:npg_ZS6yvHDEwa1G@ep-winter-dust-al1pbd
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Глобальные переменные для отслеживания времени запуска
+start_time = time.time()
 
 # Глобальные переменные для текущего бота
 current_bot_token = DEFAULT_BOT_TOKEN
@@ -742,6 +747,57 @@ async def telegram_webhook(request: Request):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# ==================== ЭНДПОИНТ ДЛЯ МОНИТОРИНГА РЕСУРСОВ ====================
+@app.get("/api/metrics")
+async def get_metrics():
+    """Эндпоинт для отслеживания использования CPU и памяти сервера"""
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    
+    # Получаем системную информацию
+    cpu_percent = psutil.cpu_percent(interval=0.5)
+    memory_mb = memory_info.rss / 1024 / 1024
+    memory_percent = process.memory_percent()
+    uptime_seconds = time.time() - start_time
+    
+    # Форматируем uptime в читаемый вид
+    uptime_days = int(uptime_seconds // 86400)
+    uptime_hours = int((uptime_seconds % 86400) // 3600)
+    uptime_minutes = int((uptime_seconds % 3600) // 60)
+    
+    uptime_str = ""
+    if uptime_days > 0:
+        uptime_str += f"{uptime_days}д "
+    if uptime_hours > 0 or uptime_days > 0:
+        uptime_str += f"{uptime_hours}ч "
+    uptime_str += f"{uptime_minutes}м"
+    
+    return {
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "cpu": {
+            "percent": round(cpu_percent, 2),
+            "cores": psutil.cpu_count()
+        },
+        "memory": {
+            "used_mb": round(memory_mb, 2),
+            "percent": round(memory_percent, 2),
+            "limit_mb": 512,  # лимит бесплатного тарифа Render
+            "warning": memory_mb > 400  # предупреждение если >80% от 512MB
+        },
+        "uptime": {
+            "seconds": round(uptime_seconds, 0),
+            "human": uptime_str
+        },
+        "database": {
+            "connected": db.pool is not None
+        },
+        "bot": {
+            "token_configured": bool(DEFAULT_BOT_TOKEN),
+            "webhook_configured": True  # будет обновляться при каждом запросе
+        }
+    }
 
 @app.get("/api/bots")
 async def get_bots():
