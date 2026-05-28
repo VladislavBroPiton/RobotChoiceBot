@@ -82,10 +82,6 @@ function setAccent(accent) {
 }
 
 document.getElementById('themeMenuItem')?.addEventListener('click', toggleThemeFromMenu);
-document.getElementById('utmMenuItem')?.addEventListener('click', () => {
-    closeMenu();
-    switchTab('utm');
-});
 document.getElementById('logoutMenuItem')?.addEventListener('click', () => {
     localStorage.removeItem('crm_token');
     localStorage.removeItem('theme');
@@ -97,6 +93,12 @@ document.querySelectorAll('.accent-option').forEach(opt => {
 });
 
 initThemeFromMenu();
+
+// ========== UTM-СТАТИСТИКА ИЗ МЕНЮ ==========
+document.getElementById('utmMenuItem')?.addEventListener('click', () => {
+    closeMenu();
+    switchTab('utm');
+});
 
 // ========== ПЕРЕМЕННЫЕ ==========
 let currentChatId = null;
@@ -193,8 +195,15 @@ function switchTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     
-    document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
-    document.getElementById(`${tabId}Tab`).classList.add('active');
+    const tabContent = document.getElementById(`${tabId}Tab`);
+    if (tabContent) {
+        tabContent.classList.add('active');
+    }
+    
+    const tabBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+    if (tabBtn) {
+        tabBtn.classList.add('active');
+    }
     
     if (tabId === 'utm') {
         loadUtmStats();
@@ -894,7 +903,6 @@ window.selectChat = async function(chatId) {
     const selectedElement = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
     if (selectedElement) selectedElement.classList.add('active');
     
-    // НА МОБИЛЬНЫХ УСТРОЙСТВАХ СКРЫВАЕМ САЙДБАР И ПОКАЗЫВАЕМ КНОПКУ "НАЗАД"
     if (isMobile()) {
         const sidebar = document.getElementById('chatsSidebar');
         const showBtn = document.getElementById('showSidebarBtn');
@@ -1084,7 +1092,6 @@ document.getElementById('messageInput')?.addEventListener('keypress', (e) => {
 // ========== ОТСЛЕЖИВАНИЕ ИЗМЕНЕНИЯ РАЗМЕРА ОКНА ==========
 window.addEventListener('resize', () => {
     if (!isMobile() && currentChatId) {
-        // На десктопе показываем сайдбар
         document.getElementById('mobileBackBtn')?.classList.remove('visible');
         document.getElementById('mobileBackBtnCompact')?.classList.remove('visible');
     }
