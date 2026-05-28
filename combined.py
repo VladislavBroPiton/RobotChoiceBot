@@ -873,6 +873,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Корневой маршрут - перенаправление на дашборд
 @app.get("/")
+@app.head("/")
 async def root():
     return RedirectResponse(url="/dashboard")
 
