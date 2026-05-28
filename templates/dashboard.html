@@ -975,12 +975,15 @@
             border-color: var(--accent);
         }
         
-        .main-content {
-            display: flex;
+        .tab-content {
+            display: none;
             flex: 1;
-            height: 100%;
             overflow: hidden;
-        }       
+        }
+        
+        .tab-content.active {
+            display: flex;
+        }
         
         .main-content {
             display: flex;
@@ -992,6 +995,7 @@
         .chats-sidebar {
             width: 350px;
             min-width: 350px;
+            flex-shrink: 0;
             background: var(--bg-sidebar);
             border-right: 1px solid var(--border);
             display: flex;
@@ -2507,9 +2511,10 @@
         
         async function loadMessagesSmart(chatId, preserveScroll = true) {
             if (isUpdating) return;
+            isUpdating = true;
             
             const container = document.getElementById('messagesContainer');
-            if (!container) return;
+            if (!container) { isUpdating = false; return; }
             
             const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
             const oldScrollHeight = container.scrollHeight;
@@ -2523,12 +2528,14 @@
                     if (lastMessageCount === 0) {
                         container.innerHTML = '<div class="empty-state">💬 Нет сообщений</div>';
                     }
+                    isUpdating = false;
                     return;
                 }
                 
                 const newLastMessageId = data.messages[data.messages.length - 1].id;
                 
                 if (lastMessageId === newLastMessageId && lastMessageCount === data.messages.length) {
+                    isUpdating = false;
                     return;
                 }
                 
@@ -2594,6 +2601,7 @@
             } catch(e) {
                 console.error('Error loading messages:', e);
             }
+            isUpdating = false;
         }
         
         async function forceLoadMessages(chatId) {
