@@ -4,6 +4,7 @@ import os
 import logging
 import signal
 import time
+import requests
 import psutil
 from datetime import datetime, date, timedelta
 from decimal import Decimal
@@ -44,13 +45,72 @@ start_time = time.time()
 # Глобальные переменные для текущего бота
 current_bot_token = DEFAULT_BOT_TOKEN
 current_bot_name = "RobotChoiceBot"
-bot = Bot(token=current_bot_token) if current_bot_token else None
+bot = None  # Будет создан после сброса соединений
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
 # Флаг для остановки polling
 polling_task = None
 is_polling_running = False
+
+# ==================== ПРИНУДИТЕЛЬНЫЙ СБРОС СТАРЫХ СОЕДИНЕНИЙ ====================
+def force_reset_telegram_connections():
+    """Принудительно закрывает все старые соединения бота с Telegram"""
+    if not DEFAULT_BOT_TOKEN:
+        logger.warning("⚠️ BOT_TOKEN not set, skipping Telegram reset")
+        return False
+    
+    logger.info("🔄 Starting force reset of Telegram connections...")
+    
+    try:
+        # 1. Удаляем вебхук и все pending updates
+        url = f"https://api.telegram.org/bot{DEFAULT_BOT_TOKEN}/deleteWebhook"
+        response = requests.post(url, json={"drop_pending_updates": True}, timeout=10)
+        webhook_result = response.json()
+        logger.info(f"🔄 Webhook deletion result: {webhook_result}")
+        
+        # 2. Закрываем все активные сессии через getUpdates с offset=-1
+        url = f"https://api.telegram.org/bot{DEFAULT_BOT_TOKEN}/getUpdates"
+        response = requests.post(url, json={"offset": -1, "timeout": 1, "limit": 1}, timeout=5)
+        updates_result = response.json()
+        
+        if updates_result.get('ok') and updates_result.get('result'):
+            last_update_id = updates_result['result'][-1]['update_id']
+            # Подтверждаем получение всех обновлений
+            url = f"https://api.telegram.org/bot{DEFAULT_BOT_TOKEN}/getUpdates"
+            response = requests.post(url, json={"offset": last_update_id + 1, "timeout": 1}, timeout=5)
+            logger.info(f"🔄 Cleared {len(updates_result['result'])} pending updates")
+        else:
+            logger.info("🔄 No pending updates to clear")
+        
+        # 3. Ждём, чтобы Telegram точно обработал запросы
+        logger.info("⏳ Waiting for Telegram to process reset...")
+        time.sleep(3)
+        
+        logger.info("✅ All old Telegram connections successfully reset")
+        return True
+        
+    except requests.exceptions.Timeout:
+        logger.warning("⚠️ Timeout while resetting Telegram connections (may be OK)")
+        return True
+    except requests.exceptions.ConnectionError:
+        logger.warning("⚠️ Connection error while resetting Telegram (server may be starting)")
+        time.sleep(2)
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to reset Telegram connections: {e}")
+        return False
+
+# Вызываем ДО создания бота
+logger.info("🚀 Initializing BotHub CRM...")
+force_reset_telegram_connections()
+
+# Создаём бота только после сброса старых соединений
+if DEFAULT_BOT_TOKEN:
+    bot = Bot(token=DEFAULT_BOT_TOKEN)
+    logger.info(f"🤖 Bot instance created for token: {DEFAULT_BOT_TOKEN[:10]}...")
+else:
+    logger.error("❌ BOT_TOKEN not found in environment variables!")
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def parse_utm_from_start_param(start_param: str) -> dict:
@@ -538,18 +598,31 @@ async def update_bot_instance(new_token: str, new_name: str):
         is_polling_running = False
         if bot:
             try:
-                await bot.delete_webhook()
+                await bot.delete_webhook(drop_pending_updates=True)
                 await bot.session.close()
-            except:
-                pass
+                logger.info("✅ Old bot session closed")
+            except Exception as e:
+                logger.error(f"❌ Error closing old bot: {e}")
         polling_task.cancel()
         try:
             await polling_task
         except asyncio.CancelledError:
             pass
     
+    # Сбрасываем старые соединения для нового токена
     current_bot_token = new_token
     current_bot_name = new_name
+    
+    # Принудительно сбрасываем соединения перед созданием нового бота
+    import requests as req
+    try:
+        url = f"https://api.telegram.org/bot{new_token}/deleteWebhook"
+        req.post(url, json={"drop_pending_updates": True}, timeout=10)
+        logger.info(f"✅ Webhook deleted for new bot: {new_name}")
+        await asyncio.sleep(2)
+    except Exception as e:
+        logger.error(f"❌ Failed to reset connections for new bot: {e}")
+    
     bot = Bot(token=current_bot_token)
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers()
@@ -559,13 +632,13 @@ async def update_bot_instance(new_token: str, new_name: str):
         async def run_polling():
             try:
                 await bot.delete_webhook(drop_pending_updates=True)
-                logger.info("✅ Вебхук удалён, запускаем polling для нового бота")
+                logger.info(f"✅ Webhook deleted, starting polling for {new_name}")
                 await asyncio.sleep(1)
                 await dp.start_polling(bot)
             except asyncio.CancelledError:
                 logger.info("Polling task cancelled")
             except Exception as e:
-                logger.error(f"Polling error: {e}")
+                logger.error(f"Polling error for {new_name}: {e}")
         
         polling_task = asyncio.create_task(run_polling())
     
@@ -741,25 +814,45 @@ register_handlers()
 async def lifespan(app: FastAPI):
     global polling_task, is_polling_running
     
-    # Небольшая пауза, чтобы старый процесс успел завершиться
-    await asyncio.sleep(2)
+    # Увеличенная пауза для гарантированного завершения старых процессов
+    logger.info("⏳ Waiting for old processes to terminate...")
+    await asyncio.sleep(5)
     
     await db.connect()
     logger.info("✅ База данных подключена")
     
-    # Запускаем polling для бота
+    # Запускаем polling с дополнительной проверкой
     if bot and not is_polling_running:
+        # Ещё раз принудительно удаляем вебхук перед стартом
+        try:
+            await bot.delete_webhook(drop_pending_updates=True)
+            logger.info("✅ Webhook deleted before polling start")
+            await asyncio.sleep(2)
+        except Exception as e:
+            logger.error(f"❌ Failed to delete webhook: {e}")
+        
         is_polling_running = True
         async def run_polling():
-            try:
-                await bot.delete_webhook(drop_pending_updates=True)
-                logger.info("✅ Вебхук удалён, запускаем polling")
-                await asyncio.sleep(1)
-                await dp.start_polling(bot)
-            except asyncio.CancelledError:
-                logger.info("Polling task cancelled")
-            except Exception as e:
-                logger.error(f"Polling error: {e}")
+            max_retries = 5
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"🔄 Starting polling (attempt {attempt + 1}/{max_retries})")
+                    await dp.start_polling(bot)
+                    break  # Если успешно запустились, выходим из цикла
+                except Exception as e:
+                    logger.error(f"❌ Polling error (attempt {attempt + 1}): {e}")
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt  # Экспоненциальная задержка: 1, 2, 4, 8 секунд
+                        logger.info(f"⏳ Waiting {wait_time}s before retry...")
+                        await asyncio.sleep(wait_time)
+                        # Пробуем сбросить соединение перед повторной попыткой
+                        try:
+                            await bot.delete_webhook(drop_pending_updates=True)
+                            await asyncio.sleep(1)
+                        except:
+                            pass
+                    else:
+                        logger.error("❌ All polling attempts failed")
         
         polling_task = asyncio.create_task(run_polling())
         logger.info("🤖 Бот запущен в режиме Long Polling")
@@ -777,10 +870,11 @@ async def lifespan(app: FastAPI):
             pass
     if bot:
         try:
-            await bot.delete_webhook()
+            await bot.delete_webhook(drop_pending_updates=True)
             await bot.session.close()
-        except:
-            pass
+            logger.info("✅ Bot session closed")
+        except Exception as e:
+            logger.error(f"❌ Error during bot shutdown: {e}")
     if db.pool:
         await db.pool.close()
     logger.info("✅ Shutdown complete")
