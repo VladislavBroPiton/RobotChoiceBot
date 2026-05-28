@@ -343,3 +343,61 @@ mark { background: var(--accent); color: white; padding: 0 2px; border-radius: 3
     .new-messages-btn { bottom: 80px; right: 20px; width: 44px; height: 44px; }
     .new-messages-btn svg { width: 20px; height: 20px; }
 }
+
+/* ========== МОБИЛЬНАЯ ВЕРСИЯ ========== */
+@media (max-width: 768px) {
+    .chats-sidebar {
+        width: 100%;
+        min-width: 100%;
+        position: absolute;
+        z-index: 50;
+        height: 100%;
+    }
+    
+    .chats-sidebar.collapsed {
+        width: 0;
+        min-width: 0;
+    }
+    
+    .messages-area {
+        width: 100%;
+    }
+    
+    .toolbar-full {
+        flex-direction: column;
+        gap: 6px;
+    }
+    
+    .export-buttons {
+        flex-wrap: wrap;
+    }
+    
+    .header {
+        padding: 8px 12px;
+    }
+    
+    .header-left h1 {
+        font-size: 14px;
+    }
+    
+    .tabs {
+        padding: 8px 12px;
+    }
+    
+    .tab-btn {
+        padding: 4px 10px;
+        font-size: 11px;
+    }
+    
+    .message-input-container {
+        padding: 8px 12px;
+    }
+    
+    .stats-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .show-sidebar-btn.visible {
+        left: 10px;
+    }
+}
