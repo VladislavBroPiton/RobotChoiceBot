@@ -192,7 +192,6 @@ document.getElementById('botSelector')?.addEventListener('change', (e) => {
 
 // ========== ВКЛАДКИ ==========
 function switchTab(tabId) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     
     const tabContent = document.getElementById(`${tabId}Tab`);
@@ -200,19 +199,10 @@ function switchTab(tabId) {
         tabContent.classList.add('active');
     }
     
-    const tabBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
-    if (tabBtn) {
-        tabBtn.classList.add('active');
-    }
-    
     if (tabId === 'utm') {
         loadUtmStats();
     }
 }
-
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-});
 
 // ========== UTM СТАТИСТИКА ==========
 async function loadUtmStats() {
@@ -383,12 +373,11 @@ function initStatusFilter() {
     });
 }
 
-// ========== ФОРМАТИРОВАНИЕ ДАТЫ ==========
+// ========== ФОРМАТИРОВАНИЕ ДАТЫ (МСК) ==========
 function formatLastMessageTime(timestamp) {
     if (!timestamp) return '';
     
     const date = new Date(timestamp);
-    // Переводим в МСК (UTC+3)
     const mskDate = new Date(date.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
     const now = new Date();
     const mskNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
