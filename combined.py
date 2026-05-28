@@ -69,6 +69,22 @@ def custom_excepthook(exc_type, exc_value, exc_traceback):
 
 sys.excepthook = custom_excepthook
 
+# ВРЕМЕННЫЙ ФИКС: Убиваем процесс только при конфликте (оставляем НАВСЕГДА)
+import sys
+import signal as sig
+
+original_excepthook = sys.excepthook
+def custom_excepthook(exc_type, exc_value, exc_traceback):
+    error_msg = str(exc_value)
+    if "Conflict" in error_msg and "terminated by other getUpdates" in error_msg:
+        logger.critical("🔴 Обнаружен конфликт с другим экземпляром. Завершаем этот процесс.")
+        logger.critical("🔴 Render перезапустит сервис с чистого листа.")
+        os.kill(os.getpid(), sig.SIGTERM)
+    else:
+        original_excepthook(exc_type, exc_value, exc_traceback)
+
+sys.excepthook = custom_excepthook
+
 # ==================== ПРИНУДИТЕЛЬНЫЙ СБРОС СТАРЫХ СОЕДИНЕНИЙ ====================
 def force_reset_telegram_connections():
     """Принудительно закрывает все старые соединения бота с Telegram"""
