@@ -82,6 +82,10 @@ function setAccent(accent) {
 }
 
 document.getElementById('themeMenuItem')?.addEventListener('click', toggleThemeFromMenu);
+document.getElementById('utmMenuItem')?.addEventListener('click', () => {
+    closeMenu();
+    switchTab('utm');
+});
 document.getElementById('logoutMenuItem')?.addEventListener('click', () => {
     localStorage.removeItem('crm_token');
     localStorage.removeItem('theme');
