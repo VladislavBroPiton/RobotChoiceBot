@@ -194,12 +194,33 @@ document.getElementById('botSelector')?.addEventListener('change', (e) => {
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
     
+    if (tabId === 'chats') {
+        const chatsTab = document.getElementById('chatsTab');
+        if (chatsTab) {
+            chatsTab.classList.add('active');
+            // Восстанавливаем отображение области сообщений, если был выбран чат
+            if (currentChatId) {
+                document.getElementById('messagesArea').style.display = 'flex';
+            }
+            // На мобильных показываем сайдбар
+            if (isMobile()) {
+                const sidebar = document.getElementById('chatsSidebar');
+                sidebar.classList.remove('mobile-hidden');
+                document.getElementById('mobileBackBtn')?.classList.remove('visible');
+                document.getElementById('mobileBackBtnCompact')?.classList.remove('visible');
+            }
+        }
+        return;
+    }
+    
     const tabContent = document.getElementById(`${tabId}Tab`);
     if (tabContent) {
         tabContent.classList.add('active');
     }
     
     if (tabId === 'utm') {
+        // Скрываем область сообщений
+        document.getElementById('messagesArea').style.display = 'none';
         loadUtmStats();
     }
 }
