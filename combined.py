@@ -45,97 +45,32 @@ start_time = time.time()
 # Глобальные переменные для текущего бота
 current_bot_token = DEFAULT_BOT_TOKEN
 current_bot_name = "RobotChoiceBot"
-bot = None  # НЕ СОЗДАЁМ БОТА СРАЗУ!
-dp = None   # НЕ СОЗДАЁМ ДИСПЕТЧЕР СРАЗУ!
+bot = None  # Создаётся только в lifespan
+dp = None   # Создаётся только в lifespan
 
 # Флаг для остановки polling
 polling_task = None
 is_polling_running = False
 
-# ==================== ПРИНУДИТЕЛЬНОЕ ЗАВЕРШЕНИЕ СТАРЫХ ЭКЗЕМПЛЯРОВ ====================
-import sys
-import signal as sig
+# ==================== ОБРАБОТКА КОНФЛИКТА ЭКЗЕМПЛЯРОВ ====================
+# При деплое на Render старый и новый экземпляры пересекаются на 5-10 секунд.
+# Этот код убивает новый процесс при конфликте, и Render запускает его заново
+# уже после остановки старого экземпляра.
 
-# Если обнаружен конфликт — завершаем процесс с ошибкой
-original_excepthook = sys.excepthook
-def custom_excepthook(exc_type, exc_value, exc_traceback):
-    if "Conflict" in str(exc_value) and "terminated by other getUpdates request" in str(exc_value):
-        logger.critical("🔴 Обнаружен конфликт с другим экземпляром бота. Завершаем процесс.")
-        logger.critical("🔴 Это нормально при деплое — старый экземпляр будет остановлен.")
-        # Отправляем SIGTERM самому себе, чтобы Render перезапустил чисто
-        os.kill(os.getpid(), sig.SIGTERM)
-    else:
-        original_excepthook(exc_type, exc_value, exc_traceback)
+import sys as _sys
+import signal as _signal
 
-sys.excepthook = custom_excepthook
-
-# ВРЕМЕННЫЙ ФИКС: Убиваем процесс только при конфликте (оставляем НАВСЕГДА)
-import sys
-import signal as sig
-
-original_excepthook = sys.excepthook
-def custom_excepthook(exc_type, exc_value, exc_traceback):
+_original_excepthook = _sys.excepthook
+def _conflict_handler(exc_type, exc_value, exc_traceback):
     error_msg = str(exc_value)
     if "Conflict" in error_msg and "terminated by other getUpdates" in error_msg:
-        logger.critical("🔴 Обнаружен конфликт с другим экземпляром. Завершаем этот процесс.")
-        logger.critical("🔴 Render перезапустит сервис с чистого листа.")
-        os.kill(os.getpid(), sig.SIGTERM)
+        logger.critical("🔴 Обнаружен конфликт с другим экземпляром бота.")
+        logger.critical("🔴 Завершаем этот процесс — Render перезапустит с чистого листа.")
+        os.kill(os.getpid(), _signal.SIGTERM)
     else:
-        original_excepthook(exc_type, exc_value, exc_traceback)
+        _original_excepthook(exc_type, exc_value, exc_traceback)
 
-sys.excepthook = custom_excepthook
-
-# ==================== ПРИНУДИТЕЛЬНЫЙ СБРОС СТАРЫХ СОЕДИНЕНИЙ ====================
-def force_reset_telegram_connections():
-    """Принудительно закрывает все старые соединения бота с Telegram"""
-    if not DEFAULT_BOT_TOKEN:
-        logger.warning("⚠️ BOT_TOKEN not set, skipping Telegram reset")
-        return False
-    
-    logger.info("🔄 Starting force reset of Telegram connections...")
-    
-    try:
-        # 1. Удаляем вебхук и все pending updates
-        url = f"https://api.telegram.org/bot{DEFAULT_BOT_TOKEN}/deleteWebhook"
-        response = requests.post(url, json={"drop_pending_updates": True}, timeout=10)
-        webhook_result = response.json()
-        logger.info(f"🔄 Webhook deletion result: {webhook_result}")
-        
-        # 2. Закрываем все активные сессии через getUpdates с offset=-1
-        url = f"https://api.telegram.org/bot{DEFAULT_BOT_TOKEN}/getUpdates"
-        response = requests.post(url, json={"offset": -1, "timeout": 1, "limit": 1}, timeout=5)
-        updates_result = response.json()
-        
-        if updates_result.get('ok') and updates_result.get('result'):
-            last_update_id = updates_result['result'][-1]['update_id']
-            # Подтверждаем получение всех обновлений
-            url = f"https://api.telegram.org/bot{DEFAULT_BOT_TOKEN}/getUpdates"
-            response = requests.post(url, json={"offset": last_update_id + 1, "timeout": 1}, timeout=5)
-            logger.info(f"🔄 Cleared {len(updates_result['result'])} pending updates")
-        else:
-            logger.info("🔄 No pending updates to clear")
-        
-        # 3. Ждём, чтобы Telegram точно обработал запросы
-        logger.info("⏳ Waiting for Telegram to process reset...")
-        time.sleep(3)
-        
-        logger.info("✅ All old Telegram connections successfully reset")
-        return True
-        
-    except requests.exceptions.Timeout:
-        logger.warning("⚠️ Timeout while resetting Telegram connections (may be OK)")
-        return True
-    except requests.exceptions.ConnectionError:
-        logger.warning("⚠️ Connection error while resetting Telegram (server may be starting)")
-        time.sleep(2)
-        return True
-    except Exception as e:
-        logger.error(f"❌ Failed to reset Telegram connections: {e}")
-        return False
-
-# Вызываем сброс ДО создания любых объектов aiogram
-logger.info("🚀 Initializing BotHub CRM...")
-force_reset_telegram_connections()
+_sys.excepthook = _conflict_handler
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def parse_utm_from_start_param(start_param: str) -> dict:
