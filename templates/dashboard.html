@@ -22,27 +22,27 @@
                 <div class="menu-item" id="botMenuItem">
                     <div class="bot-select-inline">
                         <label>🤖 Бот:</label>
-                        <select id="botSelector" class="bot-select"><option value="">Загрузка...</option></select>
+                        <select id="botSelector" class="bot-select" title="Выберите активного бота"><option value="">Загрузка...</option></select>
                     </div>
                 </div>
                 <div class="menu-divider"></div>
-                <div class="menu-item" id="utmMenuItem">
+                <div class="menu-item" id="utmMenuItem" title="Открыть UTM-статистику">
                     <span class="icon">📊</span>
                     <span>UTM-статистика</span>
                 </div>
                 <div class="menu-divider"></div>
-                <div class="menu-item" id="themeMenuItem">
+                <div class="menu-item" id="themeMenuItem" title="Переключить тему оформления">
                     <span class="icon" id="menuThemeIcon">🌙</span>
                     <span id="menuThemeText">Тёмная тема</span>
                 </div>
                 <div class="accent-selector">
                     <span>🎨 Акцент:</span>
-                    <div class="accent-option blue" data-accent="blue" title="Синий"></div>
-                    <div class="accent-option green" data-accent="green" title="Зелёный"></div>
-                    <div class="accent-option neon" data-accent="neon" title="Неоновый"></div>
+                    <div class="accent-option blue" data-accent="blue" title="Синий акцент"></div>
+                    <div class="accent-option green" data-accent="green" title="Зелёный акцент"></div>
+                    <div class="accent-option neon" data-accent="neon" title="Неоновый акцент"></div>
                 </div>
                 <div class="menu-divider"></div>
-                <div class="menu-item" id="logoutMenuItem">
+                <div class="menu-item" id="logoutMenuItem" title="Выйти из системы">
                     <span class="icon">🚪</span><span>Выйти</span>
                 </div>
             </div>
@@ -56,23 +56,28 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <span>📋 Чаты</span>
                         <div style="display: flex; gap: 6px;">
-                            <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу"><span>🔍</span><span>Фильтр</span><span id="filterBadge" class="filter-badge" style="display: none;"></span></button>
-                            <button class="collapse-btn" id="collapseBtn" title="Свернуть/развернуть панель чатов"><span class="collapse-icon" id="collapseIcon">◀</span></button>
+                            <button class="filter-btn" id="filterToggleBtn" title="Фильтр по статусу (показать/скрыть панель)">
+                                <span>🔍</span><span>Фильтр</span>
+                                <span id="filterBadge" class="filter-badge" style="display: none;"></span>
+                            </button>
+                            <button class="collapse-btn" id="collapseBtn" title="Свернуть/развернуть панель чатов">
+                                <span class="collapse-icon" id="collapseIcon">◀</span>
+                            </button>
                         </div>
                     </div>
-                    <input type="text" id="searchChatsInput" placeholder="🔍 Поиск по имени, ID или тексту сообщения...">
+                    <input type="text" id="searchChatsInput" placeholder="🔍 Поиск по имени, ID или тексту сообщения..." title="Поиск по имени, ID или тексту сообщения">
                 </div>
                 <div class="filter-panel" id="filterPanel">
                     <div class="filter-row">
                         <span class="filter-label">📌 Статус:</span>
                         <div class="status-filter" id="statusFilter">
-                            <button class="status-filter-btn active" data-status="all">Все</button>
-                            <button class="status-filter-btn" data-status="первое сообщение">🆕 Первое</button>
-                            <button class="status-filter-btn" data-status="ожидание менеджера">📞 Ожидание</button>
-                            <button class="status-filter-btn" data-status="в работе">⚙️ В работе</button>
-                            <button class="status-filter-btn" data-status="закрыт">✅ Закрыт</button>
+                            <button class="status-filter-btn active" data-status="all" title="Показать все чаты без фильтрации">Все</button>
+                            <button class="status-filter-btn" data-status="первое сообщение" title="Клиент только написал первое сообщение">🆕 Первое</button>
+                            <button class="status-filter-btn" data-status="ожидание менеджера" title="Клиент ожидает ответа от менеджера">📞 Ожидание</button>
+                            <button class="status-filter-btn" data-status="в работе" title="Менеджер взял чат в работу">⚙️ В работе</button>
+                            <button class="status-filter-btn" data-status="закрыт" title="Диалог завершён">✅ Закрыт</button>
                         </div>
-                        <span class="filter-clear" id="clearFilterBtn">✕ сбросить</span>
+                        <span class="filter-clear" id="clearFilterBtn" title="Сбросить все фильтры">✕ сбросить</span>
                     </div>
                 </div>
                 <div class="chats-list" id="chatsList"><div class="empty-state">Загрузка...</div></div>
@@ -86,20 +91,20 @@
                             <strong id="chatName" class="selected-chat-name"></strong>
                         </div>
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <select id="statusSelect" class="status-select">
+                            <select id="statusSelect" class="status-select" title="Изменить статус диалога">
                                 <option value="первое сообщение">первое сообщение</option>
                                 <option value="ожидание менеджера">ожидание менеджера</option>
                                 <option value="в работе">в работе</option>
                                 <option value="закрыт">закрыт</option>
                             </select>
-                            <button id="toggleAutoBtn" class="toggle-auto-btn">Авторежим ВКЛ</button>
-                            <button id="templatesBtn" class="templates-btn">📋 Шаблоны</button>
+                            <button id="toggleAutoBtn" class="toggle-auto-btn" title="Включить/выключить автоответы бота">Авторежим ВКЛ</button>
+                            <button id="templatesBtn" class="templates-btn" title="Использовать готовые шаблоны ответов">📋 Шаблоны</button>
                             <div class="export-buttons">
-                                <input type="date" id="exportDateFrom" class="date-input">
-                                <input type="date" id="exportDateTo" class="date-input">
-                                <button id="exportPeriodBtn" class="export-link">📊 Экспорт</button>
-                                <a href="/api/export/csv" class="export-link">📥 CSV</a>
-                                <a href="/api/export/pdf" class="export-link">📄 PDF</a>
+                                <input type="date" id="exportDateFrom" class="date-input" title="Начало периода для экспорта">
+                                <input type="date" id="exportDateTo" class="date-input" title="Конец периода для экспорта">
+                                <button id="exportPeriodBtn" class="export-link" title="Экспортировать чаты за выбранный период">📊 Экспорт</button>
+                                <a href="/api/export/csv" class="export-link" title="Экспорт всех чатов в CSV">📥 CSV</a>
+                                <a href="/api/export/pdf" class="export-link" title="Экспорт всех чатов в PDF">📄 PDF</a>
                             </div>
                         </div>
                     </div>
@@ -107,11 +112,11 @@
                         <button id="mobileBackBtnCompact" class="mobile-back-btn" title="Назад к списку чатов">← Чаты</button>
                         <strong id="chatNameCompact" class="selected-chat-name"></strong>
                         <div class="compact-status" id="compactStatus">Статус</div>
-                        <button class="compact-btn" id="compactAutoBtn">🤖</button>
-                        <button class="compact-btn" id="compactTemplatesBtn">📋</button>
-                        <button class="compact-btn" id="compactExportBtn">📊</button>
-                        <a href="/api/export/csv" class="compact-btn">📥</a>
-                        <a href="/api/export/pdf" class="compact-btn">📄</a>
+                        <button class="compact-btn" id="compactAutoBtn" title="Включить/выключить автоответы бота">🤖</button>
+                        <button class="compact-btn" id="compactTemplatesBtn" title="Использовать готовые шаблоны ответов">📋</button>
+                        <button class="compact-btn" id="compactExportBtn" title="Экспортировать чаты за выбранный период">📊</button>
+                        <a href="/api/export/csv" class="compact-btn" title="Экспорт всех чатов в CSV">📥</a>
+                        <a href="/api/export/pdf" class="compact-btn" title="Экспорт всех чатов в PDF">📄</a>
                     </div>
                     <div id="utmInfoBlock" class="utm-info-block" style="display: none;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -119,17 +124,17 @@
                                 <span>📊</span><strong>UTM-метки клиента</strong>
                                 <span style="font-size: 9px; color: var(--text-muted);">(первые касания)</span>
                             </div>
-                            <button id="showUtmHistoryBtn" class="compact-btn" style="padding: 3px 8px; font-size: 10px;">📜 История</button>
+                            <button id="showUtmHistoryBtn" class="compact-btn" style="padding: 3px 8px; font-size: 10px;" title="Показать историю всех UTM-меток клиента">📜 История</button>
                         </div>
                         <div id="utmContent" class="utm-grid"></div>
                     </div>
                 </div>
                 <div class="messages-container" id="messagesContainer"></div>
                 <div class="message-input-container">
-                    <textarea class="message-input" id="messageInput" placeholder="Написать сообщение..." rows="1"></textarea>
+                    <textarea class="message-input" id="messageInput" placeholder="Написать сообщение..." rows="1" title="Введите сообщение (Enter для отправки)"></textarea>
                     <button class="send-button" id="sendBtn" title="Отправить сообщение (Enter)">➤</button>
                 </div>
-                <button id="newMessagesBtn" class="new-messages-btn" style="display: none;" title="Новые сообщения">
+                <button id="newMessagesBtn" class="new-messages-btn" style="display: none;" title="Прокрутить к новым сообщениям">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M12 19L19 12M12 19L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <span id="newMessagesCount" class="new-messages-count">0</span>
                 </button>
@@ -147,13 +152,13 @@
     
     <div class="modal-overlay" id="templatesModal">
         <div class="modal-content">
-            <div class="modal-header"><span>📋 Шаблоны ответов</span><span class="modal-close" onclick="closeTemplatesModal()">&times;</span></div>
+            <div class="modal-header"><span>📋 Шаблоны ответов</span><span class="modal-close" onclick="closeTemplatesModal()" title="Закрыть">&times;</span></div>
             <div class="modal-body">
                 <div id="templatesList"></div>
                 <div class="add-template-form">
-                    <input type="text" id="newTemplateTitle" placeholder="Название шаблона">
-                    <textarea id="newTemplateText" rows="3" placeholder="Текст шаблона..."></textarea>
-                    <button class="add-template-btn" onclick="addTemplate()">+ Добавить шаблон</button>
+                    <input type="text" id="newTemplateTitle" placeholder="Название шаблона" title="Введите название шаблона">
+                    <textarea id="newTemplateText" rows="3" placeholder="Текст шаблона..." title="Введите текст шаблона"></textarea>
+                    <button class="add-template-btn" onclick="addTemplate()" title="Добавить новый шаблон">+ Добавить шаблон</button>
                 </div>
             </div>
         </div>
@@ -161,13 +166,13 @@
     
     <div class="modal-overlay" id="utmHistoryModal">
         <div class="modal-content" style="max-width: 700px;">
-            <div class="modal-header"><span>📜 История UTM-меток клиента</span><span class="modal-close" onclick="closeUtmHistoryModal()">&times;</span></div>
+            <div class="modal-header"><span>📜 История UTM-меток клиента</span><span class="modal-close" onclick="closeUtmHistoryModal()" title="Закрыть">&times;</span></div>
             <div class="modal-body" id="utmHistoryBody"><div class="empty-state">Загрузка...</div></div>
         </div>
     </div>
     
-    <div class="media-modal" id="mediaModal" onclick="closeMediaModal()">
-        <span class="media-close" onclick="closeMediaModal()">&times;</span>
+    <div class="media-modal" id="mediaModal" onclick="closeMediaModal()" title="Закрыть просмотр">
+        <span class="media-close" onclick="closeMediaModal()" title="Закрыть">&times;</span>
         <img id="mediaImage" style="display: none;">
         <video id="mediaVideo" controls style="display: none;"></video>
     </div>
