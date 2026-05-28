@@ -381,7 +381,8 @@ class Database:
             bot_id = active_bot['id'] if active_bot else 1
             
             query = '''
-                SELECT DISTINCT c.*, u.username, u.full_name, u.utm_source, u.utm_campaign, u.utm_medium, u.utm_term, u.utm_content, u.user_id
+                SELECT DISTINCT c.*, u.username, u.full_name, u.utm_source, u.utm_campaign, u.utm_medium, u.utm_term, u.utm_content, u.user_id,
+                       (SELECT message_text FROM messages WHERE chat_id = c.id ORDER BY timestamp DESC LIMIT 1) as last_message_text
                 FROM chats c
                 JOIN users u ON c.user_id = u.user_id
                 LEFT JOIN messages m ON c.id = m.chat_id
