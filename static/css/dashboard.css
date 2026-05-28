@@ -322,6 +322,56 @@ mark { background: var(--accent); color: white; padding: 0 2px; border-radius: 3
 .mobile-back-btn { display: none; background: var(--button-secondary); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; cursor: pointer; font-size: 12px; color: var(--text-primary); align-items: center; gap: 4px; }
 .mobile-back-btn.visible { display: inline-flex; }
 
+.utm-toolbar {
+    padding: 10px 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.utm-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--button-secondary);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 14px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-primary);
+    transition: all 0.2s;
+}
+
+.utm-back-btn:hover {
+    background: var(--accent-light);
+    border-color: var(--accent);
+}
+
+.utm-toolbar-title {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+body.dark .utm-toolbar {
+    background: #16213e;
+    border-color: #2a2a4a;
+}
+
+body.dark .utm-back-btn {
+    background: #1a1a2e;
+    border-color: #2a2a4a;
+    color: #e8e8e8;
+}
+
+body.dark .utm-back-btn:hover {
+    background: #1a3a5c;
+}
+
 /* ========== МОБИЛЬНАЯ ВЕРСИЯ ========== */
 @media (max-width: 768px) {
     .main-content { position: relative; overflow: hidden; }
