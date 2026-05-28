@@ -1034,6 +1034,19 @@ async def toggle_auto(chat_id: int):
 async def mark_read(chat_id: int):
     return {"status": "ok"}
 
+@app.post("/api/messages/{message_id}/delete")
+async def delete_message(message_id: int):
+    """Удалить сообщение по ID"""
+    async with db.pool.acquire() as conn:
+        result = await conn.execute('''
+            DELETE FROM messages WHERE id = $1
+        ''', message_id)
+        
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        return {"status": "deleted"}
+
 @app.get("/api/utm_stats")
 async def get_utm_stats():
     stats = await db.get_utm_stats()
