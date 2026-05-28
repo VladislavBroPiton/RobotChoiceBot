@@ -431,13 +431,18 @@
             color: white;
             border: none;
             cursor: pointer;
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
             box-shadow: 0 4px 12px rgba(0,0,0,0.25);
             transition: all 0.2s ease;
             z-index: 1000;
             opacity: 0.95;
+        }
+        
+        .new-messages-btn.show {
+            display: flex;
+            animation: bounceIn 0.3s ease;
         }
         
         .new-messages-btn:hover {
@@ -470,7 +475,6 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
         
-        /* Анимация появления кнопки */
         @keyframes bounceIn {
             0% {
                 opacity: 0;
@@ -486,10 +490,6 @@
             }
         }
         
-        .new-messages-btn.show {
-            animation: bounceIn 0.3s ease;
-        }
-        
         body.dark .new-messages-btn {
             background: var(--accent);
             color: #1a1a2e;
@@ -500,7 +500,6 @@
             background: var(--accent-hover);
         }
         
-        /* Адаптация для мобильных устройств */
         @media (max-width: 768px) {
             .new-messages-btn {
                 bottom: 80px;
@@ -2584,10 +2583,12 @@
                             }
                         }
                         
-                        const lastMessages = container.querySelectorAll('.message:last-child');
-                        lastMessages.forEach(msg => {
-                            msg.classList.add('new-message');
-                            setTimeout(() => msg.classList.remove('new-message'), 500);
+                        newMessages.forEach(() => {
+                            const lastMessage = container.lastElementChild;
+                            if (lastMessage) {
+                                lastMessage.classList.add('new-message');
+                                setTimeout(() => lastMessage.classList.remove('new-message'), 500);
+                            }
                         });
                     }
                 }
