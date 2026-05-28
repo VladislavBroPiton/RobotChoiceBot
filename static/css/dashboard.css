@@ -110,8 +110,6 @@ body.dark .send-button { background: var(--accent); color: #1a1a2e; }
 body.dark .send-button:hover { background: var(--accent-hover); }
 body.dark .toggle-auto-btn { background: var(--accent); color: #1a1a2e; }
 body.dark .toggle-auto-btn.off { background: #444; color: #e8e8e8; }
-body.dark .tab-btn { background: #1a1a2e; border-color: #2a2a4a; color: #b0b0c0; }
-body.dark .tab-btn.active { background: var(--accent); color: #1a1a2e; }
 body.dark .chats-header { background: #0f3460; color: #e8e8e8; }
 body.dark .chats-sidebar { background: #0f3460; }
 body.dark .messages-header { background: #16213e; }
@@ -200,10 +198,6 @@ mark { background: var(--accent); color: white; padding: 0 2px; border-radius: 3
 .bot-select-inline label { font-size: 12px; color: var(--text-secondary); }
 .bot-select-inline select { flex: 1; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); font-size: 12px; cursor: pointer; }
 
-.tabs { display: flex; gap: 8px; padding: 10px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); position: relative; z-index: 5; overflow: visible; }
-.tab-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); background: var(--button-secondary); color: var(--text-primary); cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.2s; position: relative; }
-.tab-btn:hover { background: var(--accent-light); border-color: var(--accent); }
-.tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
 .tab-content { display: none; flex: 1; overflow: hidden; }
 .tab-content.active { display: flex; }
 .main-content { display: flex; flex: 1; height: 100%; overflow: hidden; }
@@ -338,8 +332,6 @@ mark { background: var(--accent); color: white; padding: 0 2px; border-radius: 3
     .export-buttons { flex-wrap: wrap; }
     .header { padding: 8px 12px; }
     .header-left h1 { font-size: 14px; }
-    .tabs { padding: 8px 12px; }
-    .tab-btn { padding: 4px 10px; font-size: 11px; }
     .message-input-container { padding: 8px 12px; }
     .stats-container { grid-template-columns: 1fr; }
     .show-sidebar-btn.visible { left: 10px; }
