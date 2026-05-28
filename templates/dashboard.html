@@ -402,6 +402,22 @@
             color: #a0a0b0;
         }
         
+        /* Анимация для новых сообщений */
+        @keyframes fadeSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .new-message {
+            animation: fadeSlideUp 0.3s ease;
+        }
+        
         /* ========== АКЦЕНТНЫЕ ЦВЕТА ========== */
         body.accent-blue {
             --accent: #0066ff;
@@ -2137,7 +2153,7 @@
                     currentStatusFilter = btn.dataset.status;
                     updateFilterBadge();
                     loadChats();
-                    if (filterPanelVisible) toggleFilterPanel();
+                    if (filterPanelVisible) toggleFilterPanel());
                 });
             });
         }
@@ -2300,7 +2316,7 @@
         async function deleteMessage(messageId) {
             if (confirm('Удалить это сообщение?')) {
                 showToast('🗑 Сообщение удалено');
-                if (currentChatId) loadMessages(currentChatId);
+                if (currentChatId) loadMessagesSmart(currentChatId);
             }
         }
         
@@ -2327,6 +2343,139 @@
             const video = document.getElementById('mediaVideo');
             if (video) video.pause();
             modal.classList.remove('active');
+        }
+        
+        // ========== ФУНКЦИЯ ДЛЯ СОЗДАНИЯ HTML СООБЩЕНИЯ ==========
+        function createMessageHTML(msg) {
+            function getSenderInfo(senderType) {
+                switch(senderType) {
+                    case 'user': return { icon: '👤', name: 'Клиент' };
+                    case 'bot': return { icon: '🤖', name: 'RobotChoiceBot' };
+                    case 'operator': return { icon: '👨‍💼', name: 'Оператор' };
+                    default: return { icon: '💬', name: 'Сообщение' };
+                }
+            }
+            
+            const sender = getSenderInfo(msg.sender_type);
+            const time = new Date(msg.timestamp).toLocaleTimeString();
+            const messageText = escapeHtml(msg.message_text || '[Сообщение]');
+            const messageLines = messageText.split('\n').map(line => `<p>${line || '<br>'}</p>`).join('');
+            
+            const isImage = msg.file_id && (msg.message_text?.includes('.jpg') || msg.message_text?.includes('.png') || msg.message_text?.includes('.jpeg') || msg.message_text?.includes('.gif') || msg.message_text?.includes('.webp'));
+            const isVideo = msg.file_id && (msg.message_text?.includes('.mp4') || msg.message_text?.includes('.webm') || msg.message_text?.includes('.mov'));
+            const mediaHtml = isImage ? `<div class="message-media" onclick="openMediaModal('${msg.file_id}', 'image')"><img src="${msg.file_id}" alt="Вложение"></div>` : '';
+            const videoHtml = isVideo ? `<div class="message-media" onclick="openMediaModal('${msg.file_id}', 'video')"><video src="${msg.file_id}" style="width:100%; border-radius:12px;"></video></div>` : '';
+            
+            return `
+                <div class="message ${msg.sender_type}" data-message-id="${msg.id}">
+                    <div class="message-sender">
+                        <span class="sender-icon">${sender.icon}</span>
+                        <span class="sender-name">${escapeHtml(sender.name)}</span>
+                        <div class="message-actions" onclick="toggleMessageActions(${msg.id}, event)">
+                            <span class="dots">⋮</span>
+                            <div class="actions-menu" id="actions-menu-${msg.id}">
+                                <div class="action-item" onclick="pinMessage(${msg.id}, '${messageText.replace(/'/g, "\\'")}')"><span>📌</span> Закрепить</div>
+                                <div class="action-item" onclick="resendMessage(${msg.id}, '${messageText.replace(/'/g, "\\'")}')"><span>🔄</span> Переотправить</div>
+                                <div class="action-item" onclick="deleteMessage(${msg.id})"><span>🗑</span> Удалить</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="message-text">${messageLines}</div>
+                    ${mediaHtml}
+                    ${videoHtml}
+                    <div class="message-time">
+                        ${time}
+                        ${msg.sender_type === 'operator' ? '<span class="read-status read">✓✓</span>' : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ========== УМНОЕ ОБНОВЛЕНИЕ СООБЩЕНИЙ ==========
+        let lastMessageCount = 0;
+        let lastMessageId = null;
+        let isUpdating = false;
+        
+        async function loadMessagesSmart(chatId, preserveScroll = true) {
+            if (isUpdating) return;
+            
+            const container = document.getElementById('messagesContainer');
+            if (!container) return;
+            
+            const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+            const oldScrollHeight = container.scrollHeight;
+            const oldScrollTop = container.scrollTop;
+            
+            try {
+                const res = await fetch(`/api/chats/${chatId}/messages?limit=200`);
+                const data = await res.json();
+                
+                if (!data.messages || !data.messages.length) {
+                    if (lastMessageCount === 0) {
+                        container.innerHTML = '<div class="empty-state">💬 Нет сообщений</div>';
+                    }
+                    return;
+                }
+                
+                const newLastMessageId = data.messages[data.messages.length - 1].id;
+                
+                if (lastMessageId === newLastMessageId && lastMessageCount === data.messages.length) {
+                    return;
+                }
+                
+                const currentMessages = container.querySelectorAll('.message');
+                const currentIds = Array.from(currentMessages).map(el => parseInt(el.dataset.messageId));
+                const newIds = data.messages.map(m => m.id);
+                
+                const needsFullReload = currentIds.some(id => !newIds.includes(id)) || 
+                                        newIds.some(id => !currentIds.includes(id));
+                
+                if (needsFullReload || currentMessages.length === 0) {
+                    container.innerHTML = data.messages.map(msg => createMessageHTML(msg)).join('');
+                    lastMessageCount = data.messages.length;
+                    lastMessageId = newLastMessageId;
+                    
+                    if (preserveScroll && !wasAtBottom) {
+                        const newScrollHeight = container.scrollHeight;
+                        const scrollDiff = newScrollHeight - oldScrollHeight;
+                        container.scrollTop = oldScrollTop + scrollDiff;
+                    } else {
+                        container.scrollTop = container.scrollHeight;
+                    }
+                } else {
+                    const existingIds = currentIds;
+                    const newMessages = data.messages.filter(msg => !existingIds.includes(msg.id));
+                    
+                    if (newMessages.length > 0) {
+                        newMessages.forEach(msg => {
+                            const messageHtml = createMessageHTML(msg);
+                            container.insertAdjacentHTML('beforeend', messageHtml);
+                        });
+                        lastMessageCount = data.messages.length;
+                        lastMessageId = newLastMessageId;
+                        
+                        if (wasAtBottom) {
+                            container.scrollTop = container.scrollHeight;
+                        }
+                        
+                        newMessages.forEach(() => {
+                            const lastMessage = container.lastElementChild;
+                            if (lastMessage) {
+                                lastMessage.classList.add('new-message');
+                                setTimeout(() => lastMessage.classList.remove('new-message'), 500);
+                            }
+                        });
+                    }
+                }
+            } catch(e) {
+                console.error('Error loading messages:', e);
+            }
+        }
+        
+        async function forceLoadMessages(chatId) {
+            lastMessageCount = 0;
+            lastMessageId = null;
+            await loadMessagesSmart(chatId, false);
         }
         
         // ========== UTM-МЕТКИ ДЛЯ ЧАТА ==========
@@ -2426,7 +2575,7 @@
                                 <th>🎯 Кампания</th>
                                 <th>🔑 Ключевое слово</th>
                                 <th>📝 Контент</th>
-                            </tr>
+                            </table>
                         </thead>
                         <tbody>
                 `;
@@ -2480,65 +2629,6 @@
             document.getElementById('utmHistoryModal').classList.remove('active');
         }
         
-        // ========== ЗАГРУЗКА СООБЩЕНИЙ ==========
-        async function loadMessages(chatId) {
-            const res = await fetch(`/api/chats/${chatId}/messages`);
-            const data = await res.json();
-            const container = document.getElementById('messagesContainer');
-            
-            if (!data.messages.length) {
-                container.innerHTML = '<div class="empty-state">💬 Нет сообщений</div>';
-                return;
-            }
-            
-            function getSenderInfo(senderType) {
-                switch(senderType) {
-                    case 'user': return { icon: '👤', name: 'Клиент' };
-                    case 'bot': return { icon: '🤖', name: 'RobotChoiceBot' };
-                    case 'operator': return { icon: '👨‍💼', name: 'Оператор' };
-                    default: return { icon: '💬', name: 'Сообщение' };
-                }
-            }
-            
-            container.innerHTML = data.messages.map(msg => {
-                const sender = getSenderInfo(msg.sender_type);
-                const time = new Date(msg.timestamp).toLocaleTimeString();
-                const messageText = escapeHtml(msg.message_text || '[Сообщение]');
-                const messageLines = messageText.split('\n').map(line => `<p>${line || '<br>'}</p>`).join('');
-                
-                const isImage = msg.file_id && (msg.message_text?.includes('.jpg') || msg.message_text?.includes('.png') || msg.message_text?.includes('.jpeg') || msg.message_text?.includes('.gif') || msg.message_text?.includes('.webp'));
-                const isVideo = msg.file_id && (msg.message_text?.includes('.mp4') || msg.message_text?.includes('.webm') || msg.message_text?.includes('.mov'));
-                const mediaHtml = isImage ? `<div class="message-media" onclick="openMediaModal('${msg.file_id}', 'image')"><img src="${msg.file_id}" alt="Вложение"></div>` : '';
-                const videoHtml = isVideo ? `<div class="message-media" onclick="openMediaModal('${msg.file_id}', 'video')"><video src="${msg.file_id}" style="width:100%; border-radius:12px;"></video></div>` : '';
-                
-                return `
-                    <div class="message ${msg.sender_type}">
-                        <div class="message-sender">
-                            <span class="sender-icon">${sender.icon}</span>
-                            <span class="sender-name">${escapeHtml(sender.name)}</span>
-                            <div class="message-actions" onclick="toggleMessageActions(${msg.id}, event)">
-                                <span class="dots">⋮</span>
-                                <div class="actions-menu" id="actions-menu-${msg.id}">
-                                    <div class="action-item" onclick="pinMessage(${msg.id}, '${messageText.replace(/'/g, "\\'")}')"><span>📌</span> Закрепить</div>
-                                    <div class="action-item" onclick="resendMessage(${msg.id}, '${messageText.replace(/'/g, "\\'")}')"><span>🔄</span> Переотправить</div>
-                                    <div class="action-item" onclick="deleteMessage(${msg.id})"><span>🗑</span> Удалить</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="message-text">${messageLines}</div>
-                        ${mediaHtml}
-                        ${videoHtml}
-                        <div class="message-time">
-                            ${time}
-                            ${msg.sender_type === 'operator' ? '<span class="read-status read">✓✓</span>' : ''}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-            
-            container.scrollTop = container.scrollHeight;
-        }
-        
         // ========== ВЫБОР ЧАТА ==========
         window.selectChat = async function(chatId) {
             currentChatId = chatId;
@@ -2567,7 +2657,7 @@
                 await loadUtmForChat(chatId);
                 
                 document.getElementById('messagesArea').style.display = 'flex';
-                await loadMessages(chatId);
+                await forceLoadMessages(chatId);
                 await fetch(`/api/chats/${chatId}/mark-read`, { method: 'POST' });
             } catch(e) {
                 console.error('Error loading chat:', e);
@@ -2598,7 +2688,9 @@
             
             if (res.ok) {
                 input.value = '';
-                await loadMessages(currentChatId);
+                lastMessageCount = 0;
+                lastMessageId = null;
+                await loadMessagesSmart(currentChatId, false);
             }
         }
         
@@ -2741,14 +2833,18 @@
             }
         });
         
+        // Обновление списка чатов (без перезагрузки сообщений)
+        setInterval(() => {
+            loadChats();
+            if (currentChatId) {
+                loadMessagesSmart(currentChatId, true);
+            }
+        }, 10000);
+        
         initStatusFilter();
         initSidebarState();
         loadBots();
         loadChats();
-        setInterval(() => {
-            loadChats();
-            if (currentChatId) loadMessages(currentChatId);
-        }, 10000);
     </script>
 </body>
 </html>
