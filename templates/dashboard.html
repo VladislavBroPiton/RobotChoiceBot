@@ -418,6 +418,102 @@
             animation: fadeSlideUp 0.3s ease;
         }
         
+        /* Кнопка "Новые сообщения" */
+        .new-messages-btn {
+            position: absolute;
+            bottom: 90px;
+            right: 20px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            transition: all 0.2s ease;
+            z-index: 100;
+            opacity: 0.95;
+        }
+        
+        .new-messages-btn:hover {
+            transform: scale(1.08);
+            opacity: 1;
+            background: var(--accent-hover);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+        }
+        
+        .new-messages-btn svg {
+            width: 22px;
+            height: 22px;
+        }
+        
+        .new-messages-count {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            min-width: 22px;
+            height: 22px;
+            border-radius: 11px;
+            background: #ff4444;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        /* Анимация появления кнопки */
+        @keyframes bounceIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.3);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.1);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .new-messages-btn.show {
+            animation: bounceIn 0.3s ease;
+        }
+        
+        body.dark .new-messages-btn {
+            background: var(--accent);
+            color: #1a1a2e;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        
+        body.dark .new-messages-btn:hover {
+            background: var(--accent-hover);
+        }
+        
+        /* Адаптация для мобильных устройств */
+        @media (max-width: 768px) {
+            .new-messages-btn {
+                bottom: 80px;
+                right: 15px;
+                width: 44px;
+                height: 44px;
+            }
+            
+            .new-messages-btn svg {
+                width: 20px;
+                height: 20px;
+            }
+        }
+        
         /* ========== АКЦЕНТНЫЕ ЦВЕТА ========== */
         body.accent-blue {
             --accent: #0066ff;
@@ -1101,6 +1197,7 @@
             flex-direction: column;
             background: var(--bg-primary);
             overflow: visible;
+            position: relative;
         }
         
         .messages-header {
@@ -1743,6 +1840,14 @@
                     <textarea class="message-input" id="messageInput" placeholder="Написать сообщение..." rows="1"></textarea>
                     <button class="send-button" id="sendBtn" title="Отправить сообщение (Enter)">➤</button>
                 </div>
+                
+                <!-- Кнопка "Новые сообщения" -->
+                <button id="newMessagesBtn" class="new-messages-btn" style="display: none;" title="Новые сообщения">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 5V19M12 19L19 12M12 19L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span id="newMessagesCount" class="new-messages-count">0</span>
+                </button>
             </div>
         </div>
     </div>
@@ -1913,6 +2018,11 @@
         let searchTimeout = null;
         let currentSearchQuery = '';
         let currentActionsMessageId = null;
+        
+        // Переменные для кнопки "Новые сообщения"
+        let pendingNewMessages = 0;
+        let isUserAtBottom = true;
+        let scrollTimeout = null;
         
         // ========== ФУНКЦИЯ ОБНОВЛЕНИЯ ЗАГОЛОВКА ==========
         function updateCrmTitle(botName) {
@@ -2180,7 +2290,7 @@
             }
         }
         
-        // ========== ЗАГРУЗКА ЧАТОВ С ВРЕМЕНЕМ И ПРЕДПРОСМОТРОМ ==========
+        // ========== ЗАГРУЗКА ЧАТОВ ==========
         function escapeRegex(string) {
             return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
@@ -2441,6 +2551,9 @@
                         container.scrollTop = oldScrollTop + scrollDiff;
                     } else {
                         container.scrollTop = container.scrollHeight;
+                        // Если мы внизу, сбрасываем счётчик новых сообщений
+                        pendingNewMessages = 0;
+                        updateNewMessagesButton();
                     }
                 } else {
                     const existingIds = currentIds;
@@ -2456,6 +2569,12 @@
                         
                         if (wasAtBottom) {
                             container.scrollTop = container.scrollHeight;
+                            pendingNewMessages = 0;
+                            updateNewMessagesButton();
+                        } else {
+                            // Пользователь не внизу — показываем кнопку с количеством
+                            pendingNewMessages += newMessages.length;
+                            updateNewMessagesButton();
                         }
                         
                         newMessages.forEach(() => {
@@ -2476,6 +2595,80 @@
             lastMessageCount = 0;
             lastMessageId = null;
             await loadMessagesSmart(chatId, false);
+        }
+        
+        // ========== КНОПКА "НОВЫЕ СООБЩЕНИЯ" ==========
+        function checkIfAtBottom() {
+            const container = document.getElementById('messagesContainer');
+            if (!container) return true;
+            
+            const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+            if (atBottom !== isUserAtBottom) {
+                isUserAtBottom = atBottom;
+                if (isUserAtBottom) {
+                    pendingNewMessages = 0;
+                    updateNewMessagesButton();
+                } else {
+                    updateNewMessagesButton();
+                }
+            }
+            return atBottom;
+        }
+        
+        function updateNewMessagesButton() {
+            const btn = document.getElementById('newMessagesBtn');
+            const countSpan = document.getElementById('newMessagesCount');
+            
+            if (!btn || !countSpan) return;
+            
+            if (pendingNewMessages > 0 && !isUserAtBottom) {
+                countSpan.textContent = pendingNewMessages > 99 ? '99+' : pendingNewMessages;
+                btn.style.display = 'flex';
+                btn.classList.add('show');
+            } else {
+                btn.style.display = 'none';
+                btn.classList.remove('show');
+            }
+        }
+        
+        function scrollToBottomMessages() {
+            const container = document.getElementById('messagesContainer');
+            if (!container) return;
+            
+            container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'smooth'
+            });
+            
+            setTimeout(() => {
+                if (checkIfAtBottom()) {
+                    pendingNewMessages = 0;
+                    updateNewMessagesButton();
+                }
+            }, 300);
+        }
+        
+        function initNewMessagesButton() {
+            const container = document.getElementById('messagesContainer');
+            const btn = document.getElementById('newMessagesBtn');
+            
+            if (!container || !btn) return;
+            
+            container.addEventListener('scroll', () => {
+                if (scrollTimeout) clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
+                    checkIfAtBottom();
+                }, 150);
+            });
+            
+            btn.addEventListener('click', scrollToBottomMessages);
+            
+            const resizeObserver = new ResizeObserver(() => {
+                checkIfAtBottom();
+            });
+            resizeObserver.observe(container);
+            
+            checkIfAtBottom();
         }
         
         // ========== UTM-МЕТКИ ДЛЯ ЧАТА ==========
@@ -2575,7 +2768,7 @@
                                 <th>🎯 Кампания</th>
                                 <th>🔑 Ключевое слово</th>
                                 <th>📝 Контент</th>
-                            </table>
+                            </tr>
                         </thead>
                         <tbody>
                 `;
@@ -2632,6 +2825,12 @@
         // ========== ВЫБОР ЧАТА ==========
         window.selectChat = async function(chatId) {
             currentChatId = chatId;
+            
+            // Сбрасываем счётчик новых сообщений
+            pendingNewMessages = 0;
+            isUserAtBottom = true;
+            const newBtn = document.getElementById('newMessagesBtn');
+            if (newBtn) newBtn.style.display = 'none';
             
             document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
             const selectedElement = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
@@ -2691,6 +2890,19 @@
                 lastMessageCount = 0;
                 lastMessageId = null;
                 await loadMessagesSmart(currentChatId, false);
+                
+                // Прокручиваем вниз после отправки
+                setTimeout(() => {
+                    const container = document.getElementById('messagesContainer');
+                    if (container) {
+                        container.scrollTo({
+                            top: container.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                        pendingNewMessages = 0;
+                        updateNewMessagesButton();
+                    }
+                }, 100);
             }
         }
         
@@ -2833,7 +3045,10 @@
             }
         });
         
-        // Обновление списка чатов (без перезагрузки сообщений)
+        // Инициализация кнопки новых сообщений
+        initNewMessagesButton();
+        
+        // Обновление списка чатов
         setInterval(() => {
             loadChats();
             if (currentChatId) {
