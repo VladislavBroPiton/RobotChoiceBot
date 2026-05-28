@@ -52,6 +52,23 @@ dp = None   # НЕ СОЗДАЁМ ДИСПЕТЧЕР СРАЗУ!
 polling_task = None
 is_polling_running = False
 
+# ==================== ПРИНУДИТЕЛЬНОЕ ЗАВЕРШЕНИЕ СТАРЫХ ЭКЗЕМПЛЯРОВ ====================
+import sys
+import signal as sig
+
+# Если обнаружен конфликт — завершаем процесс с ошибкой
+original_excepthook = sys.excepthook
+def custom_excepthook(exc_type, exc_value, exc_traceback):
+    if "Conflict" in str(exc_value) and "terminated by other getUpdates request" in str(exc_value):
+        logger.critical("🔴 Обнаружен конфликт с другим экземпляром бота. Завершаем процесс.")
+        logger.critical("🔴 Это нормально при деплое — старый экземпляр будет остановлен.")
+        # Отправляем SIGTERM самому себе, чтобы Render перезапустил чисто
+        os.kill(os.getpid(), sig.SIGTERM)
+    else:
+        original_excepthook(exc_type, exc_value, exc_traceback)
+
+sys.excepthook = custom_excepthook
+
 # ==================== ПРИНУДИТЕЛЬНЫЙ СБРОС СТАРЫХ СОЕДИНЕНИЙ ====================
 def force_reset_telegram_connections():
     """Принудительно закрывает все старые соединения бота с Telegram"""
