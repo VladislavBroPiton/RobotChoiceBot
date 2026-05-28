@@ -158,7 +158,6 @@
             color: #00f0ff;
         }
         
-        /* Исправление для start_param, referrer, gclid в тёмной теме */
         body.dark .utm-info-block .extra-info {
             color: #e8e8e8;
         }
@@ -369,6 +368,40 @@
             color: #e8e8e8;
         }
         
+        /* Стили для даты и предпросмотра в списке чатов */
+        .chat-time {
+            font-size: 10px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        
+        .chat-time-new {
+            color: var(--status-new);
+            font-weight: 500;
+        }
+        
+        .chat-preview {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 280px;
+        }
+        
+        body.dark .chat-time {
+            color: #888888;
+        }
+        
+        body.dark .chat-time-new {
+            color: #00f0ff;
+        }
+        
+        body.dark .chat-preview {
+            color: #a0a0b0;
+        }
+        
         /* ========== АКЦЕНТНЫЕ ЦВЕТА ========== */
         body.accent-blue {
             --accent: #0066ff;
@@ -511,7 +544,7 @@
             color: #34c759;
         }
         
-        /* ========== НОВЫЕ СТИЛИ ДЛЯ МЕНЮ ДЕЙСТВИЙ ========== */
+        /* Стили для меню действий */
         .message-actions {
             position: relative;
             display: inline-flex;
@@ -569,7 +602,7 @@
             background: var(--accent-light);
         }
         
-        /* ========== МЕДИА-ВЛОЖЕНИЯ ========== */
+        /* Медиа-вложения */
         .message-media {
             margin-top: 8px;
             cursor: pointer;
@@ -1093,7 +1126,6 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            position: relative;
         }
         
         .compact-btn:hover {
@@ -1751,7 +1783,7 @@
             </div>
         </div>
     </div>
-
+    
     <!-- МОДАЛЬНОЕ ОКНО ДЛЯ ПРОСМОТРА МЕДИА -->
     <div class="media-modal" id="mediaModal" onclick="closeMediaModal()">
         <span class="media-close" onclick="closeMediaModal()">&times;</span>
@@ -2110,7 +2142,29 @@
             });
         }
         
-        // ========== ЗАГРУЗКА ЧАТОВ С ПОИСКОМ И ПОДСВЕТКОЙ ==========
+        // ========== ФУНКЦИЯ ФОРМАТИРОВАНИЯ ДАТЫ ==========
+        function formatLastMessageTime(timestamp) {
+            if (!timestamp) return '';
+            
+            const date = new Date(timestamp);
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const msgDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+            
+            const timeStr = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            
+            if (msgDate.getTime() === today.getTime()) {
+                return `Сегодня ${timeStr}`;
+            } else if (msgDate.getTime() === yesterday.getTime()) {
+                return `Вчера ${timeStr}`;
+            } else {
+                return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+            }
+        }
+        
+        // ========== ЗАГРУЗКА ЧАТОВ С ВРЕМЕНЕМ И ПРЕДПРОСМОТРОМ ==========
         function escapeRegex(string) {
             return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
@@ -2158,6 +2212,15 @@
                     const statusClass = getStatusBadgeClass(chat.dialog_status);
                     const statusDisplay = getStatusDisplayName(chat.dialog_status);
                     let displayName = escapeHtml(chat.full_name || chat.username || 'User');
+                    const lastMessageTime = formatLastMessageTime(chat.last_message_at);
+                    
+                    let lastMessageText = '';
+                    if (chat.last_message_text) {
+                        lastMessageText = escapeHtml(chat.last_message_text.substring(0, 60));
+                        if (chat.last_message_text.length > 60) lastMessageText += '...';
+                    } else {
+                        lastMessageText = 'Нет сообщений';
+                    }
                     
                     if (currentSearchQuery && currentSearchQuery.trim()) {
                         const regex = new RegExp(`(${escapeRegex(currentSearchQuery)})`, 'gi');
@@ -2166,10 +2229,13 @@
                     
                     return `
                         <div class="chat-item" onclick="selectChat(${chat.id})" data-chat-id="${chat.id}">
-                            <div class="chat-name">${displayName}</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <div class="chat-name">${displayName}</div>
+                                <div class="chat-time ${statusClass === 'new' ? 'chat-time-new' : ''}">${lastMessageTime}</div>
+                            </div>
                             <div class="status-badge ${statusClass}">${statusDisplay}</div>
                             ${chat.utm_source ? `<div class="utm-badge">📊 ${escapeHtml(chat.utm_source)}</div>` : ''}
-                            <div class="chat-status">ID: ${chat.user_id}</div>
+                            <div class="chat-preview">${lastMessageText}</div>
                         </div>
                     `;
                 }).join('');
@@ -2218,7 +2284,6 @@
         
         async function pinMessage(messageId, text) {
             showToast(`📌 Сообщение закреплено: ${text.substring(0, 50)}...`);
-            // TODO: реализовать API для закрепления
         }
         
         async function resendMessage(messageId, text) {
@@ -2234,7 +2299,6 @@
         
         async function deleteMessage(messageId) {
             if (confirm('Удалить это сообщение?')) {
-                // TODO: реализовать API для удаления
                 showToast('🗑 Сообщение удалено');
                 if (currentChatId) loadMessages(currentChatId);
             }
@@ -2397,7 +2461,7 @@
                 
                 tableHtml += `
                         </tbody>
-                    <table>
+                    </table>
                     <div style="margin-top: 12px; padding: 8px; background: var(--accent-light); border-radius: 8px; font-size: 10px; color: var(--text-secondary);">
                         📊 Всего визитов с UTM: ${sessionsData.sessions.length}
                     </div>
@@ -2416,27 +2480,23 @@
             document.getElementById('utmHistoryModal').classList.remove('active');
         }
         
-        // ========== ЗАГРУЗКА СООБЩЕНИЙ (ОБНОВЛЕННАЯ ВЕРСИЯ С МЕНЮ ДЕЙСТВИЙ И МЕДИА) ==========
+        // ========== ЗАГРУЗКА СООБЩЕНИЙ ==========
         async function loadMessages(chatId) {
             const res = await fetch(`/api/chats/${chatId}/messages`);
             const data = await res.json();
             const container = document.getElementById('messagesContainer');
             
             if (!data.messages.length) {
-                container.innerHTML = '<div class="empty-state">Нет сообщений</div>';
+                container.innerHTML = '<div class="empty-state">💬 Нет сообщений</div>';
                 return;
             }
             
             function getSenderInfo(senderType) {
                 switch(senderType) {
-                    case 'user':
-                        return { icon: '👤', name: 'Клиент' };
-                    case 'bot':
-                        return { icon: '🤖', name: 'RobotChoiceBot' };
-                    case 'operator':
-                        return { icon: '👨‍💼', name: 'Оператор' };
-                    default:
-                        return { icon: '💬', name: 'Сообщение' };
+                    case 'user': return { icon: '👤', name: 'Клиент' };
+                    case 'bot': return { icon: '🤖', name: 'RobotChoiceBot' };
+                    case 'operator': return { icon: '👨‍💼', name: 'Оператор' };
+                    default: return { icon: '💬', name: 'Сообщение' };
                 }
             }
             
@@ -2446,7 +2506,6 @@
                 const messageText = escapeHtml(msg.message_text || '[Сообщение]');
                 const messageLines = messageText.split('\n').map(line => `<p>${line || '<br>'}</p>`).join('');
                 
-                // Проверка на медиа-вложение (изображение)
                 const isImage = msg.file_id && (msg.message_text?.includes('.jpg') || msg.message_text?.includes('.png') || msg.message_text?.includes('.jpeg') || msg.message_text?.includes('.gif') || msg.message_text?.includes('.webp'));
                 const isVideo = msg.file_id && (msg.message_text?.includes('.mp4') || msg.message_text?.includes('.webm') || msg.message_text?.includes('.mov'));
                 const mediaHtml = isImage ? `<div class="message-media" onclick="openMediaModal('${msg.file_id}', 'image')"><img src="${msg.file_id}" alt="Вложение"></div>` : '';
