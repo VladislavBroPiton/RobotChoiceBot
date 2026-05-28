@@ -575,7 +575,7 @@ function createMessageHTML(msg) {
     }
     
     const sender = getSenderInfo(msg.sender_type);
-    const time = new Date(msg.timestamp).toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow' });
+    const time = new Date(msg.timestamp + 'Z').toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow' });
     const messageText = escapeHtml(msg.message_text || '[Сообщение]');
     const messageLines = messageText.split('\n').map(line => `<p>${line || '<br>'}</p>`).join('');
     
