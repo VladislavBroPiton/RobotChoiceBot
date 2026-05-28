@@ -370,7 +370,7 @@ class Database:
                 VALUES ($1, $2, $3, $4)
             ''', chat_id, sender_type, message_text, file_id)
             await conn.execute('''
-                UPDATE chats SET last_message_at = NOW() WHERE id = $1
+                UPDATE chats SET last_message_at = NOW() AT TIME ZONE 'Europe/Moscow' WHERE id = $1
             ''', chat_id)
 
     async def get_messages(self, chat_id: int, limit: int = 100):
