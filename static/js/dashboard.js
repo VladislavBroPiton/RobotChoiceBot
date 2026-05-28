@@ -388,20 +388,24 @@ function formatLastMessageTime(timestamp) {
     if (!timestamp) return '';
     
     const date = new Date(timestamp);
+    // Переводим в МСК (UTC+3)
+    const mskDate = new Date(date.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const mskNow = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
+    
+    const today = new Date(mskNow.getFullYear(), mskNow.getMonth(), mskNow.getDate());
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    const msgDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const msgDate = new Date(mskDate.getFullYear(), mskDate.getMonth(), mskDate.getDate());
     
-    const timeStr = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const timeStr = mskDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     
     if (msgDate.getTime() === today.getTime()) {
         return `Сегодня ${timeStr}`;
     } else if (msgDate.getTime() === yesterday.getTime()) {
         return `Вчера ${timeStr}`;
     } else {
-        return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+        return mskDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
     }
 }
 
@@ -582,7 +586,7 @@ function createMessageHTML(msg) {
     }
     
     const sender = getSenderInfo(msg.sender_type);
-    const time = new Date(msg.timestamp).toLocaleTimeString();
+    const time = new Date(msg.timestamp).toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow' });
     const messageText = escapeHtml(msg.message_text || '[Сообщение]');
     const messageLines = messageText.split('\n').map(line => `<p>${line || '<br>'}</p>`).join('');
     
