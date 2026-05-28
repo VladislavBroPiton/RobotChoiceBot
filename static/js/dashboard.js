@@ -107,6 +107,11 @@ let pendingNewMessages = 0;
 let isUserAtBottom = true;
 let scrollTimeout = null;
 
+// ========== ОПРЕДЕЛЕНИЕ МОБИЛЬНОГО УСТРОЙСТВА ==========
+function isMobile() {
+    return window.innerWidth <= 768;
+}
+
 // ========== ФУНКЦИЯ ОБНОВЛЕНИЯ ЗАГОЛОВКА ==========
 function updateCrmTitle(botName) {
     const botNameTag = document.getElementById('botNameTag');
@@ -288,6 +293,20 @@ function initSidebarState() {
         messagesHeader?.classList.remove('compact-mode');
     }
 }
+
+// ========== МОБИЛЬНАЯ КНОПКА "НАЗАД К ЧАТАМ" ==========
+function showChatsListMobile() {
+    const sidebar = document.getElementById('chatsSidebar');
+    const showBtn = document.getElementById('showSidebarBtn');
+    sidebar.classList.remove('mobile-hidden');
+    sidebar.classList.remove('collapsed');
+    showBtn.classList.remove('visible');
+    document.getElementById('mobileBackBtn')?.classList.remove('visible');
+    document.getElementById('mobileBackBtnCompact')?.classList.remove('visible');
+}
+
+document.getElementById('mobileBackBtn')?.addEventListener('click', showChatsListMobile);
+document.getElementById('mobileBackBtnCompact')?.addEventListener('click', showChatsListMobile);
 
 // ========== ФИЛЬТРЫ ==========
 function toggleFilterPanel() {
@@ -871,6 +890,16 @@ window.selectChat = async function(chatId) {
     const selectedElement = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
     if (selectedElement) selectedElement.classList.add('active');
     
+    // НА МОБИЛЬНЫХ УСТРОЙСТВАХ СКРЫВАЕМ САЙДБАР И ПОКАЗЫВАЕМ КНОПКУ "НАЗАД"
+    if (isMobile()) {
+        const sidebar = document.getElementById('chatsSidebar');
+        const showBtn = document.getElementById('showSidebarBtn');
+        sidebar.classList.add('mobile-hidden');
+        showBtn.classList.add('visible');
+        document.getElementById('mobileBackBtn')?.classList.add('visible');
+        document.getElementById('mobileBackBtnCompact')?.classList.add('visible');
+    }
+    
     try {
         const chatRes = await fetch(`/api/chats/${chatId}/full`);
         const chat = await chatRes.json();
@@ -1046,6 +1075,15 @@ document.getElementById('exportPeriodBtn')?.addEventListener('click', exportPeri
 document.getElementById('showUtmHistoryBtn')?.addEventListener('click', showUtmHistory);
 document.getElementById('messageInput')?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+// ========== ОТСЛЕЖИВАНИЕ ИЗМЕНЕНИЯ РАЗМЕРА ОКНА ==========
+window.addEventListener('resize', () => {
+    if (!isMobile() && currentChatId) {
+        // На десктопе показываем сайдбар
+        document.getElementById('mobileBackBtn')?.classList.remove('visible');
+        document.getElementById('mobileBackBtnCompact')?.classList.remove('visible');
+    }
 });
 
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
