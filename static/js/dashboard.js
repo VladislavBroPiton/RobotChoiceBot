@@ -464,12 +464,12 @@ async function loadChats() {
             return `
                 <div class="chat-item" onclick="selectChat(${chat.id})" data-chat-id="${chat.id}">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                        <div class="chat-name">${displayName}</div>
-                        <div class="chat-time ${statusClass === 'new' ? 'chat-time-new' : ''}">${lastMessageTime}</div>
+                        <div class="chat-name" title="Открыть диалог с ${escapeHtml(chat.full_name || chat.username || 'User')}">${displayName}</div>
+                        <div class="chat-time ${statusClass === 'new' ? 'chat-time-new' : ''}" title="Время последнего сообщения">${lastMessageTime}</div>
                     </div>
-                    <div class="status-badge ${statusClass}">${statusDisplay}</div>
-                    ${chat.utm_source ? `<div class="utm-badge">📊 ${escapeHtml(chat.utm_source)}</div>` : ''}
-                    <div class="chat-preview">${lastMessageText}</div>
+                    <div class="status-badge ${statusClass}" title="Текущий статус диалога">${statusDisplay}</div>
+                    ${chat.utm_source ? `<div class="utm-badge" title="Источник трафика: ${escapeHtml(chat.utm_source)}">📊 ${escapeHtml(chat.utm_source)}</div>` : ''}
+                    <div class="chat-preview" title="${escapeHtml(chat.last_message_text || 'Нет сообщений')}">${lastMessageText}</div>
                 </div>
             `;
         }).join('');
@@ -592,9 +592,9 @@ function createMessageHTML(msg) {
                 <div class="message-actions" onclick="toggleMessageActions(${msg.id}, event)">
                     <span class="dots">⋮</span>
                     <div class="actions-menu" id="actions-menu-${msg.id}">
-                        <div class="action-item" onclick="pinMessage(${msg.id}, '${messageText.replace(/'/g, "\\'")}')"><span>📌</span> Закрепить</div>
-                        <div class="action-item" onclick="resendMessage(${msg.id}, '${messageText.replace(/'/g, "\\'")}')"><span>🔄</span> Переотправить</div>
-                        <div class="action-item" onclick="deleteMessage(${msg.id})"><span>🗑</span> Удалить</div>
+                        <div class="action-item" onclick="pinMessage(${msg.id}, '${messageText.replace(/'/g, "\\'")}')" title="Закрепить это сообщение"><span>📌</span> Закрепить</div>
+                        <div class="action-item" onclick="resendMessage(${msg.id}, '${messageText.replace(/'/g, "\\'")}')" title="Отправить это сообщение повторно"><span>🔄</span> Переотправить</div>
+                        <div class="action-item" onclick="deleteMessage(${msg.id})" title="Удалить это сообщение"><span>🗑</span> Удалить</div>
                     </div>
                 </div>
             </div>
