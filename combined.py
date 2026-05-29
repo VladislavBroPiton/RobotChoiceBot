@@ -708,6 +708,12 @@ def register_handlers():
 
     @dp.message()
     async def handle_message(message: types.Message):
+        # Проверяем, управляет ли CRM этим ботом
+        active_bot = await db.get_active_bot()
+        if active_bot and not active_bot.get('managed_by_crm', True):
+            # Для наблюдаемых ботов ничего не делаем — они управляются своим сервером
+            return
+        
         user = message.from_user
         chat_data = await db.get_or_create_chat(user.id, user.username, user.full_name)
         
