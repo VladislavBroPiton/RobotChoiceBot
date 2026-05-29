@@ -708,27 +708,31 @@ def register_handlers():
 
     @dp.message()
     async def handle_message(message: types.Message):
+        logger.info(f"📩 Получено сообщение от user {message.from_user.id}: {message.text[:50] if message.text else 'no text'}")
+        
         # Находим бота в базе по токену
         async with db.pool.acquire() as conn:
             bot_row = await conn.fetchrow(
                 "SELECT * FROM bot_instances WHERE bot_token = $1",
                 DEFAULT_BOT_TOKEN
             )
-        
-        if not bot_row:
-            return
-        
-        bot_id = bot_row['id']
-        
-        if not bot_row.get('managed_by_crm', True):
-            return
-        
-        user = message.from_user
-        
-        # Сохраняем пользователя и получаем/создаём чат
-        async with db.pool.acquire() as conn:
-            existing_user = await conn.fetchrow("SELECT user_id FROM users WHERE user_id = $1", user.id)
             
+            if not bot_row:
+                logger.error("❌ Бот не найден в базе по токену")
+                return
+            
+            logger.info(f"🤖 Найден бот: {bot_row['name']} (id={bot_row['id']}, managed_by_crm={bot_row['managed_by_crm']})")
+            
+            bot_id = bot_row['id']
+            
+            if not bot_row.get('managed_by_crm', True):
+                logger.info("👁️ Бот не управляется CRM — пропускаем")
+                return
+            
+            user = message.from_user
+            
+            # Сохраняем пользователя
+            existing_user = await conn.fetchrow("SELECT user_id FROM users WHERE user_id = $1", user.id)
             if existing_user:
                 await conn.execute(
                     "UPDATE users SET username = $1, full_name = $2, last_active = NOW() WHERE user_id = $3",
@@ -736,11 +740,12 @@ def register_handlers():
                 )
             else:
                 await conn.execute(
-                    """INSERT INTO users (user_id, username, full_name, bot_id)
-                    VALUES ($1, $2, $3, $4)""",
+                    "INSERT INTO users (user_id, username, full_name, bot_id) VALUES ($1, $2, $3, $4)",
                     user.id, user.username, user.full_name, bot_id
                 )
+                logger.info(f"👤 Создан новый пользователь: {user.id}")
             
+            # Получаем или создаём чат
             chat_row = await conn.fetchrow(
                 "SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2",
                 user.id, bot_id
@@ -751,17 +756,26 @@ def register_handlers():
                     "INSERT INTO chats (user_id, bot_id) VALUES ($1, $2) RETURNING *",
                     user.id, bot_id
                 )
+                logger.info(f"💬 Создан новый чат: {chat_row['id']}")
             
             chat_id = chat_row['id']
-        
-        # Сохраняем сообщение через db.save_message (уже с правильным chat_id)
-        await db.save_message(chat_id, 'user', message.text, 
-                              message.document.file_id if message.document else None)
+            logger.info(f"📝 Сохраняю сообщение в chat_id={chat_id}")
+            
+            # Сохраняем сообщение
+            await conn.execute(
+                "INSERT INTO messages (chat_id, sender_type, message_text) VALUES ($1, $2, $3)",
+                chat_id, 'user', message.text
+            )
+            await conn.execute(
+                "UPDATE chats SET last_message_at = NOW() AT TIME ZONE 'Europe/Moscow' WHERE id = $1",
+                chat_id
+            )
+            logger.info(f"✅ Сообщение сохранено: {message.text[:50]}")
         
         # Получаем данные чата для автоответа
         chat_data = await db.get_chat_by_id(chat_id)
         
-        if chat_data['auto_mode']:
+        if chat_data and chat_data.get('auto_mode'):
             client_message_count = await db.get_client_message_count(chat_id)
             
             if client_message_count >= 3:
@@ -774,7 +788,7 @@ def register_handlers():
                 )
                 await message.answer(response, parse_mode="Markdown")
                 await db.save_message(chat_id, 'bot', response)
-        else:
+        elif chat_data:
             for admin_id in ADMIN_IDS:
                 try:
                     await bot.send_message(
