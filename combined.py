@@ -708,28 +708,24 @@ def register_handlers():
 
     @dp.message()
     async def handle_message(message: types.Message):
-        # Получаем токен текущего бота из диспетчера
-        me = await bot.get_me()
-        
         # Находим бота в базе по токену
         async with db.pool.acquire() as conn:
             bot_row = await conn.fetchrow(
                 "SELECT * FROM bot_instances WHERE bot_token = $1",
-                DEFAULT_BOT_TOKEN  # Токен текущего бота CRM
+                DEFAULT_BOT_TOKEN
             )
         
         if not bot_row:
-            return  # Бот не найден в базе
+            return
         
         bot_id = bot_row['id']
         
-        # Если бот не управляется CRM — не сохраняем сообщения
         if not bot_row.get('managed_by_crm', True):
             return
         
         user = message.from_user
         
-        # Сохраняем с правильным bot_id
+        # Сохраняем пользователя и получаем/создаём чат
         async with db.pool.acquire() as conn:
             existing_user = await conn.fetchrow("SELECT user_id FROM users WHERE user_id = $1", user.id)
             
@@ -745,7 +741,6 @@ def register_handlers():
                     user.id, user.username, user.full_name, bot_id
                 )
             
-            # Получаем или создаём чат
             chat_row = await conn.fetchrow(
                 "SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2",
                 user.id, bot_id
@@ -758,12 +753,12 @@ def register_handlers():
                 )
             
             chat_id = chat_row['id']
-            
-            # Сохраняем сообщение
-            await db.save_message(chat_id, 'user', message.text, 
-                                  message.document.file_id if message.document else None)
         
-        # Получаем данные чата для ответа
+        # Сохраняем сообщение через db.save_message (уже с правильным chat_id)
+        await db.save_message(chat_id, 'user', message.text, 
+                              message.document.file_id if message.document else None)
+        
+        # Получаем данные чата для автоответа
         chat_data = await db.get_chat_by_id(chat_id)
         
         if chat_data['auto_mode']:
