@@ -39,20 +39,15 @@ DATABASE_URL = "postgresql://neondb_owner:npg_ZS6yvHDEwa1G@ep-winter-dust-al1pbd
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Глобальные переменные для отслеживания времени запуска
 start_time = time.time()
-
-# Глобальные переменные для текущего бота
 current_bot_token = DEFAULT_BOT_TOKEN
 current_bot_name = "RobotChoiceBot"
 bot = None
 dp = None
-
-# Флаг для остановки polling
 polling_task = None
 is_polling_running = False
 
-# ==================== ОБРАБОТКА КОНФЛИКТА ЭКЗЕМПЛЯРОВ ====================
+# ==================== ОБРАБОТКА КОНФЛИКТА ====================
 import sys as _sys
 import signal as _signal
 
@@ -70,7 +65,6 @@ _sys.excepthook = _conflict_handler
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def parse_utm_from_start_param(start_param: str) -> dict:
-    """Парсит UTM-метки из параметра start"""
     if not start_param:
         return {}
     
@@ -529,7 +523,6 @@ def create_bot_and_dispatcher():
 async def update_bot_instance(new_token: str, new_name: str):
     global bot, dp, current_bot_token, current_bot_name, polling_task, is_polling_running
     
-    # Останавливаем текущий polling если он запущен
     if polling_task and not polling_task.done():
         is_polling_running = False
         if bot:
@@ -548,7 +541,6 @@ async def update_bot_instance(new_token: str, new_name: str):
     current_bot_token = new_token
     current_bot_name = new_name
     
-    # Принудительно сбрасываем соединения перед созданием нового бота
     try:
         url = f"https://api.telegram.org/bot{new_token}/deleteWebhook"
         requests.post(url, json={"drop_pending_updates": True}, timeout=10)
@@ -557,12 +549,10 @@ async def update_bot_instance(new_token: str, new_name: str):
     except Exception as e:
         logger.error(f"❌ Failed to reset connections for new bot: {e}")
     
-    # Создаём нового бота
     bot = Bot(token=current_bot_token)
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers()
     
-    # Перезапускаем polling с новым ботом
     if is_polling_running:
         async def run_polling():
             try:
@@ -582,16 +572,53 @@ async def update_bot_instance(new_token: str, new_name: str):
 def register_handlers():
     @dp.message(Command("start"))
     async def cmd_start(message: types.Message):
-        user = message.from_user
-        start_param = message.text.replace('/start', '').strip()
-        if start_param.startswith(' '):
-            start_param = start_param[1:]
-        if start_param == '':
-            start_param = None
-        
-        chat_data = await db.get_or_create_chat(
-            user.id, user.username, user.full_name, start_param
-        )
+        async with db.pool.acquire() as conn:
+            bot_row = await conn.fetchrow(
+                "SELECT * FROM bot_instances WHERE bot_token = $1",
+                DEFAULT_BOT_TOKEN
+            )
+            if not bot_row:
+                return
+            bot_id = bot_row['id']
+            
+            user = message.from_user
+            start_param = message.text.replace('/start', '').strip()
+            if start_param.startswith(' '):
+                start_param = start_param[1:]
+            if start_param == '':
+                start_param = None
+            
+            existing_user = await conn.fetchrow("SELECT user_id FROM users WHERE user_id = $1", user.id)
+            if existing_user:
+                await conn.execute(
+                    "UPDATE users SET username = $1, full_name = $2, last_active = NOW() WHERE user_id = $3",
+                    user.username, user.full_name, user.id
+                )
+            else:
+                await conn.execute(
+                    "INSERT INTO users (user_id, username, full_name, bot_id) VALUES ($1, $2, $3, $4)",
+                    user.id, user.username, user.full_name, bot_id
+                )
+            
+            chat_row = await conn.fetchrow(
+                "SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2",
+                user.id, bot_id
+            )
+            if not chat_row:
+                chat_row = await conn.fetchrow(
+                    "INSERT INTO chats (user_id, bot_id) VALUES ($1, $2) RETURNING *",
+                    user.id, bot_id
+                )
+            chat_id = chat_row['id']
+            
+            await conn.execute(
+                "INSERT INTO messages (chat_id, sender_type, message_text) VALUES ($1, $2, $3)",
+                chat_id, 'user', f"/start от {user.username or user.full_name}"
+            )
+            await conn.execute(
+                "UPDATE chats SET last_message_at = NOW() AT TIME ZONE 'Europe/Moscow' WHERE id = $1",
+                chat_id
+            )
         
         if start_param:
             logger.info(f"New user {user.id} from: {start_param}")
@@ -601,23 +628,54 @@ def register_handlers():
             [InlineKeyboardButton(text="💬 Связаться с менеджером", callback_data="contact_manager")]
         ])
         
-        await message.answer(
+        welcome_text = (
             "🤖 *Добро пожаловать в RobotChoiceBot!*\n\n"
             "Я помогу вам подобрать и настроить торгового робота для биржи.\n\n"
             "📌 *Что вы можете сделать:*\n"
             "• Посмотреть список доступных роботов\n"
             "• Получить консультацию\n"
             "• Задать вопрос менеджеру\n\n"
-            "👇 *Выберите действие:*",
-            reply_markup=keyboard,
-            parse_mode="Markdown"
+            "👇 *Выберите действие:*"
         )
         
-        await db.save_message(chat_data['id'], 'user', f"/start от {user.username or user.full_name}")
+        await message.answer(welcome_text, reply_markup=keyboard, parse_mode="Markdown")
+        await db.save_message(chat_id, 'bot', welcome_text)
 
     @dp.callback_query()
     async def handle_callback(callback: types.CallbackQuery):
-        chat_data = await db.get_or_create_chat(callback.from_user.id)
+        async with db.pool.acquire() as conn:
+            bot_row = await conn.fetchrow(
+                "SELECT * FROM bot_instances WHERE bot_token = $1",
+                DEFAULT_BOT_TOKEN
+            )
+            if not bot_row:
+                return
+            bot_id = bot_row['id']
+            
+            user = callback.from_user
+            
+            existing_user = await conn.fetchrow("SELECT user_id FROM users WHERE user_id = $1", user.id)
+            if existing_user:
+                await conn.execute(
+                    "UPDATE users SET username = $1, full_name = $2, last_active = NOW() WHERE user_id = $3",
+                    user.username, user.full_name, user.id
+                )
+            else:
+                await conn.execute(
+                    "INSERT INTO users (user_id, username, full_name, bot_id) VALUES ($1, $2, $3, $4)",
+                    user.id, user.username, user.full_name, bot_id
+                )
+            
+            chat_row = await conn.fetchrow(
+                "SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2",
+                user.id, bot_id
+            )
+            if not chat_row:
+                chat_row = await conn.fetchrow(
+                    "INSERT INTO chats (user_id, bot_id) VALUES ($1, $2) RETURNING *",
+                    user.id, bot_id
+                )
+            chat_id = chat_row['id']
         
         if callback.data == "services":
             text = (
@@ -636,11 +694,11 @@ def register_handlers():
                 [InlineKeyboardButton(text="🔙 Назад", callback_data="back")]
             ])
             await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
-            await db.save_message(chat_data['id'], 'user', callback.data)
-            await db.save_message(chat_data['id'], 'bot', text)
+            await db.save_message(chat_id, 'user', callback.data)
+            await db.save_message(chat_id, 'bot', text)
             
         elif callback.data == "contact_manager":
-            await db.update_dialog_status(chat_data['id'], 'ожидание менеджера')
+            await db.update_dialog_status(chat_id, 'ожидание менеджера')
             text = (
                 "📞 *Менеджер скоро свяжется с вами!*\n\n"
                 "А пока вы можете:\n"
@@ -653,8 +711,8 @@ def register_handlers():
                 [InlineKeyboardButton(text="🔙 Назад", callback_data="back")]
             ])
             await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
-            await db.save_message(chat_data['id'], 'user', callback.data)
-            await db.save_message(chat_data['id'], 'bot', text)
+            await db.save_message(chat_id, 'user', callback.data)
+            await db.save_message(chat_id, 'bot', text)
             
             for admin_id in ADMIN_IDS:
                 try:
@@ -687,8 +745,8 @@ def register_handlers():
                 [InlineKeyboardButton(text="🔙 Назад", callback_data="services")]
             ])
             await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
-            await db.save_message(chat_data['id'], 'user', callback.data)
-            await db.save_message(chat_data['id'], 'bot', text)
+            await db.save_message(chat_id, 'user', callback.data)
+            await db.save_message(chat_id, 'bot', text)
             
         elif callback.data == "back":
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -701,16 +759,13 @@ def register_handlers():
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )
-            await db.save_message(chat_data['id'], 'user', callback.data)
-            await db.save_message(chat_data['id'], 'bot', "Возврат в главное меню")
+            await db.save_message(chat_id, 'user', callback.data)
+            await db.save_message(chat_id, 'bot', "Возврат в главное меню")
         
         await callback.answer()
 
     @dp.message()
     async def handle_message(message: types.Message):
-        logger.info(f"📩 Получено сообщение от user {message.from_user.id}: {message.text[:50] if message.text else 'no text'}")
-        
-        # Находим бота в базе по токену
         async with db.pool.acquire() as conn:
             bot_row = await conn.fetchrow(
                 "SELECT * FROM bot_instances WHERE bot_token = $1",
@@ -718,20 +773,15 @@ def register_handlers():
             )
             
             if not bot_row:
-                logger.error("❌ Бот не найден в базе по токену")
                 return
-            
-            logger.info(f"🤖 Найден бот: {bot_row['name']} (id={bot_row['id']}, managed_by_crm={bot_row['managed_by_crm']})")
             
             bot_id = bot_row['id']
             
             if not bot_row.get('managed_by_crm', True):
-                logger.info("👁️ Бот не управляется CRM — пропускаем")
                 return
             
             user = message.from_user
             
-            # Сохраняем пользователя
             existing_user = await conn.fetchrow("SELECT user_id FROM users WHERE user_id = $1", user.id)
             if existing_user:
                 await conn.execute(
@@ -743,9 +793,7 @@ def register_handlers():
                     "INSERT INTO users (user_id, username, full_name, bot_id) VALUES ($1, $2, $3, $4)",
                     user.id, user.username, user.full_name, bot_id
                 )
-                logger.info(f"👤 Создан новый пользователь: {user.id}")
             
-            # Получаем или создаём чат
             chat_row = await conn.fetchrow(
                 "SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2",
                 user.id, bot_id
@@ -756,12 +804,9 @@ def register_handlers():
                     "INSERT INTO chats (user_id, bot_id) VALUES ($1, $2) RETURNING *",
                     user.id, bot_id
                 )
-                logger.info(f"💬 Создан новый чат: {chat_row['id']}")
             
             chat_id = chat_row['id']
-            logger.info(f"📝 Сохраняю сообщение в chat_id={chat_id}")
             
-            # Сохраняем сообщение
             await conn.execute(
                 "INSERT INTO messages (chat_id, sender_type, message_text) VALUES ($1, $2, $3)",
                 chat_id, 'user', message.text
@@ -770,9 +815,7 @@ def register_handlers():
                 "UPDATE chats SET last_message_at = NOW() AT TIME ZONE 'Europe/Moscow' WHERE id = $1",
                 chat_id
             )
-            logger.info(f"✅ Сообщение сохранено: {message.text[:50]}")
         
-        # Получаем данные чата для автоответа
         chat_data = await db.get_chat_by_id(chat_id)
         
         if chat_data and chat_data.get('auto_mode'):
@@ -952,7 +995,6 @@ async def switch_bot(request: Request):
     else:
         global current_bot_name
         current_bot_name = bot_data['name']
-        # НЕ трогаем polling/вебхук для наблюдаемых ботов
         logger.info(f"👁️ Переключён контекст на наблюдаемого бота: {current_bot_name}")
     
     return {
@@ -967,11 +1009,7 @@ async def get_chats(limit: int = 50, offset: int = 0, status: str = None):
     return {"chats": chats, "total": len(chats)}
 
 @app.get("/api/chats/search")
-async def search_chats_endpoint(
-    q: str = Query(None),
-    status: str = Query(None),
-    limit: int = Query(100)
-):
+async def search_chats_endpoint(q: str = Query(None), status: str = Query(None), limit: int = Query(100)):
     chats = await db.search_chats(search_query=q, status_filter=status, limit=limit)
     return {"chats": chats, "total": len(chats)}
 
