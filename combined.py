@@ -708,19 +708,66 @@ def register_handlers():
 
     @dp.message()
     async def handle_message(message: types.Message):
-        # Проверяем, управляет ли CRM этим ботом
-        active_bot = await db.get_active_bot()
-        if active_bot and not active_bot.get('managed_by_crm', True):
-            # Для наблюдаемых ботов ничего не делаем — они управляются своим сервером
+        # Получаем токен текущего бота из диспетчера
+        me = await bot.get_me()
+        
+        # Находим бота в базе по токену
+        async with db.pool.acquire() as conn:
+            bot_row = await conn.fetchrow(
+                "SELECT * FROM bot_instances WHERE bot_token = $1",
+                DEFAULT_BOT_TOKEN  # Токен текущего бота CRM
+            )
+        
+        if not bot_row:
+            return  # Бот не найден в базе
+        
+        bot_id = bot_row['id']
+        
+        # Если бот не управляется CRM — не сохраняем сообщения
+        if not bot_row.get('managed_by_crm', True):
             return
         
         user = message.from_user
-        chat_data = await db.get_or_create_chat(user.id, user.username, user.full_name)
         
-        await db.save_message(chat_data['id'], 'user', message.text, message.document.file_id if message.document else None)
+        # Сохраняем с правильным bot_id
+        async with db.pool.acquire() as conn:
+            existing_user = await conn.fetchrow("SELECT user_id FROM users WHERE user_id = $1", user.id)
+            
+            if existing_user:
+                await conn.execute(
+                    "UPDATE users SET username = $1, full_name = $2, last_active = NOW() WHERE user_id = $3",
+                    user.username, user.full_name, user.id
+                )
+            else:
+                await conn.execute(
+                    """INSERT INTO users (user_id, username, full_name, bot_id)
+                    VALUES ($1, $2, $3, $4)""",
+                    user.id, user.username, user.full_name, bot_id
+                )
+            
+            # Получаем или создаём чат
+            chat_row = await conn.fetchrow(
+                "SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2",
+                user.id, bot_id
+            )
+            
+            if not chat_row:
+                chat_row = await conn.fetchrow(
+                    "INSERT INTO chats (user_id, bot_id) VALUES ($1, $2) RETURNING *",
+                    user.id, bot_id
+                )
+            
+            chat_id = chat_row['id']
+            
+            # Сохраняем сообщение
+            await db.save_message(chat_id, 'user', message.text, 
+                                  message.document.file_id if message.document else None)
+        
+        # Получаем данные чата для ответа
+        chat_data = await db.get_chat_by_id(chat_id)
         
         if chat_data['auto_mode']:
-            client_message_count = await db.get_client_message_count(chat_data['id'])
+            client_message_count = await db.get_client_message_count(chat_id)
             
             if client_message_count >= 3:
                 response = (
@@ -731,7 +778,7 @@ def register_handlers():
                     "• Изучить статистику"
                 )
                 await message.answer(response, parse_mode="Markdown")
-                await db.save_message(chat_data['id'], 'bot', response)
+                await db.save_message(chat_id, 'bot', response)
         else:
             for admin_id in ADMIN_IDS:
                 try:
