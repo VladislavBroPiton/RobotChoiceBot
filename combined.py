@@ -529,6 +529,7 @@ def create_bot_and_dispatcher():
 async def update_bot_instance(new_token: str, new_name: str):
     global bot, dp, current_bot_token, current_bot_name, polling_task, is_polling_running
     
+    # Останавливаем текущий polling если он запущен
     if polling_task and not polling_task.done():
         is_polling_running = False
         if bot:
@@ -547,6 +548,7 @@ async def update_bot_instance(new_token: str, new_name: str):
     current_bot_token = new_token
     current_bot_name = new_name
     
+    # Принудительно сбрасываем соединения перед созданием нового бота
     try:
         url = f"https://api.telegram.org/bot{new_token}/deleteWebhook"
         requests.post(url, json={"drop_pending_updates": True}, timeout=10)
@@ -555,10 +557,12 @@ async def update_bot_instance(new_token: str, new_name: str):
     except Exception as e:
         logger.error(f"❌ Failed to reset connections for new bot: {e}")
     
+    # Создаём нового бота
     bot = Bot(token=current_bot_token)
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers()
     
+    # Перезапускаем polling с новым ботом
     if is_polling_running:
         async def run_polling():
             try:
@@ -755,6 +759,7 @@ async def lifespan(app: FastAPI):
     
     active_bot = await db.get_active_bot()
     if active_bot and active_bot.get('managed_by_crm', True) and bot and not is_polling_running:
+        logger.info(f"🤖 Активный бот '{active_bot['name']}' управляется CRM — запускаем polling")
         try:
             await bot.delete_webhook(drop_pending_updates=True)
             logger.info("✅ Webhook deleted before polling start")
@@ -885,7 +890,8 @@ async def switch_bot(request: Request):
     else:
         global current_bot_name
         current_bot_name = bot_data['name']
-        logger.info(f"📊 Переключён контекст на наблюдаемого бота: {current_bot_name}")
+        # НЕ трогаем polling/вебхук для наблюдаемых ботов
+        logger.info(f"👁️ Переключён контекст на наблюдаемого бота: {current_bot_name}")
     
     return {
         "status": "switched", 
