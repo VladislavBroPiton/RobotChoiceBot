@@ -45,8 +45,8 @@ start_time = time.time()
 # Глобальные переменные для текущего бота
 current_bot_token = DEFAULT_BOT_TOKEN
 current_bot_name = "RobotChoiceBot"
-bot = None  # НЕ СОЗДАЁМ БОТА СРАЗУ!
-dp = None   # НЕ СОЗДАЁМ ДИСПЕТЧЕР СРАЗУ!
+bot = None
+dp = None
 
 # Флаг для остановки polling
 polling_task = None
@@ -70,13 +70,12 @@ _sys.excepthook = _conflict_handler
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 def parse_utm_from_start_param(start_param: str) -> dict:
-    """Парсит UTM-метки из параметра start (формат: id__source__medium__campaign__term__content)"""
+    """Парсит UTM-метки из параметра start"""
     if not start_param:
         return {}
     
     utm_data = {}
     
-    # Формат: id__source__medium__campaign__term__content
     if '__' in start_param:
         parts = start_param.split('__')
         utm_data['start_param'] = parts[0] if len(parts) > 0 else ''
@@ -89,7 +88,6 @@ def parse_utm_from_start_param(start_param: str) -> dict:
         logger.info(f"✅ UTM parsed from '{start_param}': {utm_data}")
         return utm_data
     
-    # Обычный текст
     utm_data['start_param'] = start_param
     logger.info(f"⚠️ No UTM found in '{start_param}', using as simple start_param")
     return utm_data
@@ -106,7 +104,6 @@ class Database:
 
     async def init_tables(self):
         async with self.pool.acquire() as conn:
-            # Таблица ботов
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS bot_instances (
                     id SERIAL PRIMARY KEY,
@@ -117,16 +114,13 @@ class Database:
                 )
             ''')
             
-            # Добавляем колонку managed_by_crm (если её нет)
             await conn.execute('ALTER TABLE bot_instances ADD COLUMN IF NOT EXISTS managed_by_crm BOOLEAN DEFAULT TRUE')
             
-            # Удаляем дубликаты ботов (оставляем только первого)
             await conn.execute('''
                 DELETE FROM bot_instances 
                 WHERE id NOT IN (SELECT MIN(id) FROM bot_instances GROUP BY name)
             ''')
             
-            # Добавляем бота по умолчанию, если нет ни одного
             row = await conn.fetchrow('SELECT COUNT(*) FROM bot_instances')
             if row['count'] == 0:
                 await conn.execute('''
@@ -134,12 +128,10 @@ class Database:
                     VALUES ('RobotChoiceBot', $1, TRUE)
                 ''', DEFAULT_BOT_TOKEN)
             else:
-                # Если бот уже есть, но ни один не активен, активируем первого
                 active = await conn.fetchval('SELECT COUNT(*) FROM bot_instances WHERE is_active = TRUE')
                 if active == 0:
                     await conn.execute('UPDATE bot_instances SET is_active = TRUE ORDER BY id LIMIT 1')
             
-            # Таблица пользователей
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS users (
                     user_id BIGINT PRIMARY KEY,
@@ -160,7 +152,6 @@ class Database:
             await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS start_param TEXT')
             await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS gclid TEXT')
             
-            # Таблица чатов
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS chats (
                     id SERIAL PRIMARY KEY,
@@ -181,7 +172,6 @@ class Database:
                 await conn.execute('UPDATE chats SET bot_id = $1 WHERE bot_id IS NULL', active_bot['id'])
                 await conn.execute('UPDATE users SET bot_id = $1 WHERE bot_id IS NULL', active_bot['id'])
             
-            # Таблица сообщений
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS messages (
                     id SERIAL PRIMARY KEY,
@@ -193,7 +183,6 @@ class Database:
                 )
             ''')
             
-            # Таблица для хранения истории UTM-меток
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS user_sessions (
                     id SERIAL PRIMARY KEY,
@@ -212,7 +201,6 @@ class Database:
                 )
             ''')
             
-            # Таблица статистики
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS crm_stats (
                     id SERIAL PRIMARY KEY,
@@ -226,7 +214,6 @@ class Database:
             
             await conn.execute('ALTER TABLE crm_stats ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
             
-            # Индексы
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_bot_id ON users(bot_id)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_chats_bot_id ON chats(bot_id)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_source ON users(utm_source)')
@@ -527,7 +514,6 @@ class Database:
 # ==================== БОТ ====================
 db = Database()
 
-# Функция для создания бота (вызывается только когда нужно)
 def create_bot_and_dispatcher():
     global bot, dp
     if not DEFAULT_BOT_TOKEN:
@@ -543,7 +529,6 @@ def create_bot_and_dispatcher():
 async def update_bot_instance(new_token: str, new_name: str):
     global bot, dp, current_bot_token, current_bot_name, polling_task, is_polling_running
     
-    # Останавливаем текущий polling если он запущен
     if polling_task and not polling_task.done():
         is_polling_running = False
         if bot:
@@ -562,7 +547,6 @@ async def update_bot_instance(new_token: str, new_name: str):
     current_bot_token = new_token
     current_bot_name = new_name
     
-    # Принудительно сбрасываем соединения перед созданием нового бота
     try:
         url = f"https://api.telegram.org/bot{new_token}/deleteWebhook"
         requests.post(url, json={"drop_pending_updates": True}, timeout=10)
@@ -571,12 +555,10 @@ async def update_bot_instance(new_token: str, new_name: str):
     except Exception as e:
         logger.error(f"❌ Failed to reset connections for new bot: {e}")
     
-    # Создаём нового бота
     bot = Bot(token=current_bot_token)
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers()
     
-    # Перезапускаем polling с новым ботом
     if is_polling_running:
         async def run_polling():
             try:
@@ -754,8 +736,6 @@ def register_handlers():
                 except:
                     pass
 
-# НЕ ВЫЗЫВАЕМ register_handlers() здесь! Он будет вызван в create_bot_and_dispatcher()
-
 # ==================== API ДЛЯ CRM ====================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -767,17 +747,14 @@ async def lifespan(app: FastAPI):
     await db.connect()
     logger.info("✅ База данных подключена")
     
-    # СОЗДАЁМ БОТА ТОЛЬКО ЗДЕСЬ, после всех ожиданий
     if not bot:
         if create_bot_and_dispatcher():
             logger.info("🤖 Bot created in lifespan")
         else:
             logger.error("❌ Failed to create bot in lifespan")
     
-        # Проверяем, управляет ли CRM активным ботом
     active_bot = await db.get_active_bot()
     if active_bot and active_bot.get('managed_by_crm', True) and bot and not is_polling_running:
-        # Принудительно удаляем вебхук перед стартом
         try:
             await bot.delete_webhook(drop_pending_updates=True)
             logger.info("✅ Webhook deleted before polling start")
@@ -811,15 +788,9 @@ async def lifespan(app: FastAPI):
         logger.info("🤖 Бот запущен в режиме Long Polling")
     elif active_bot and not active_bot.get('managed_by_crm', True):
         logger.info(f"👁️ Активный бот '{active_bot['name']}' в режиме только просмотр — polling не запущен")
-        
-        polling_task = asyncio.create_task(run_polling())
-        logger.info("🤖 Бот запущен в режиме Long Polling")
-    elif active_bot and not active_bot.get('managed_by_crm', True):
-        logger.info(f"👁️ Активный бот '{active_bot['name']}' в режиме только просмотр — polling не запущен")
     
     yield
     
-    # Graceful shutdown
     logger.info("🔄 Shutting down...")
     is_polling_running = False
     if polling_task and not polling_task.done():
@@ -864,7 +835,6 @@ async def telegram_webhook(request: Request):
 async def health():
     return {"status": "ok"}
 
-# ==================== МОНИТОРИНГ ====================
 @app.get("/api/metrics")
 async def get_metrics():
     process = psutil.Process()
@@ -889,30 +859,13 @@ async def get_metrics():
     return {
         "status": "ok",
         "timestamp": datetime.now().isoformat(),
-        "cpu": {
-            "percent": round(cpu_percent, 2),
-            "cores": psutil.cpu_count()
-        },
-        "memory": {
-            "used_mb": round(memory_mb, 2),
-            "percent": round(memory_percent, 2),
-            "limit_mb": 512,
-            "warning": memory_mb > 400
-        },
-        "uptime": {
-            "seconds": round(uptime_seconds, 0),
-            "human": uptime_str
-        },
-        "database": {
-            "connected": db.pool is not None
-        },
-        "bot": {
-            "token_configured": bool(DEFAULT_BOT_TOKEN),
-            "polling_active": is_polling_running
-        }
+        "cpu": {"percent": round(cpu_percent, 2), "cores": psutil.cpu_count()},
+        "memory": {"used_mb": round(memory_mb, 2), "percent": round(memory_percent, 2), "limit_mb": 512, "warning": memory_mb > 400},
+        "uptime": {"seconds": round(uptime_seconds, 0), "human": uptime_str},
+        "database": {"connected": db.pool is not None},
+        "bot": {"token_configured": bool(DEFAULT_BOT_TOKEN), "polling_active": is_polling_running}
     }
 
-# ==================== API БОТОВ ====================
 @app.get("/api/bots")
 async def get_bots():
     bots = await db.get_all_bots()
@@ -927,7 +880,6 @@ async def switch_bot(request: Request):
     if not bot_data:
         raise HTTPException(status_code=404, detail="Bot not found")
     
-    # Запускаем polling только если CRM управляет этим ботом
     if bot_data.get('managed_by_crm', True):
         await update_bot_instance(bot_data['bot_token'], bot_data['name'])
     else:
@@ -941,7 +893,6 @@ async def switch_bot(request: Request):
         "managed_by_crm": bot_data.get('managed_by_crm', True)
     }
 
-# ==================== API ЧАТОВ ====================
 @app.get("/api/chats")
 async def get_chats(limit: int = 50, offset: int = 0, status: str = None):
     chats = await db.get_all_chats(limit, offset, status)
@@ -949,9 +900,9 @@ async def get_chats(limit: int = 50, offset: int = 0, status: str = None):
 
 @app.get("/api/chats/search")
 async def search_chats_endpoint(
-    q: str = Query(None, description="Поисковый запрос"),
-    status: str = Query(None, description="Фильтр по статусу"),
-    limit: int = Query(100, description="Лимит результатов")
+    q: str = Query(None),
+    status: str = Query(None),
+    limit: int = Query(100)
 ):
     chats = await db.search_chats(search_query=q, status_filter=status, limit=limit)
     return {"chats": chats, "total": len(chats)}
@@ -1020,18 +971,12 @@ async def mark_read(chat_id: int):
 
 @app.post("/api/messages/{message_id}/delete")
 async def delete_message(message_id: int):
-    """Удалить сообщение по ID"""
     async with db.pool.acquire() as conn:
-        result = await conn.execute('''
-            DELETE FROM messages WHERE id = $1
-        ''', message_id)
-        
+        result = await conn.execute('DELETE FROM messages WHERE id = $1', message_id)
         if result == "DELETE 0":
             raise HTTPException(status_code=404, detail="Message not found")
-        
         return {"status": "deleted"}
 
-# ==================== API СТАТИСТИКИ И ЭКСПОРТА ====================
 @app.get("/api/utm_stats")
 async def get_utm_stats():
     stats = await db.get_utm_stats()
@@ -1049,28 +994,13 @@ async def export_csv(chat_id: int = None):
     if chat_id:
         chat = await db.get_chat_by_id(chat_id)
         if chat:
-            writer.writerow([
-                chat['id'], chat['user_id'], chat.get('full_name', ''),
-                chat.get('dialog_status', ''), chat.get('auto_mode', ''),
-                chat.get('utm_source', ''), chat.get('utm_campaign', ''),
-                chat.get('created_at', ''), chat.get('last_message_at', '')
-            ])
+            writer.writerow([chat['id'], chat['user_id'], chat.get('full_name', ''), chat.get('dialog_status', ''), chat.get('auto_mode', ''), chat.get('utm_source', ''), chat.get('utm_campaign', ''), chat.get('created_at', ''), chat.get('last_message_at', '')])
     else:
         chats = await db.get_all_chats(limit=1000)
         for chat in chats:
-            writer.writerow([
-                chat['id'], chat['user_id'], chat.get('full_name', ''),
-                chat.get('dialog_status', ''), chat.get('auto_mode', ''),
-                chat.get('utm_source', ''), chat.get('utm_campaign', ''),
-                chat.get('created_at', ''), chat.get('last_message_at', '')
-            ])
+            writer.writerow([chat['id'], chat['user_id'], chat.get('full_name', ''), chat.get('dialog_status', ''), chat.get('auto_mode', ''), chat.get('utm_source', ''), chat.get('utm_campaign', ''), chat.get('created_at', ''), chat.get('last_message_at', '')])
     
-    response = StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=chats_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
-    )
-    return response
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=chats_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"})
 
 @app.get("/api/export/pdf")
 async def export_pdf(chat_id: int = None):
@@ -1078,7 +1008,6 @@ async def export_pdf(chat_id: int = None):
     from io import BytesIO
     
     buffer = BytesIO()
-    
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     styles = getSampleStyleSheet()
     story = []
@@ -1095,12 +1024,7 @@ async def export_pdf(chat_id: int = None):
         data = [[c['id'], c['user_id'], c.get('full_name', ''), c.get('dialog_status', '')] for c in chats]
     
     table = Table([["ID чата", "ID пользователя", "Имя", "Статус"]] + data)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.grey),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('GRID', (0,0), (-1,-1), 1, colors.black)
-    ]))
+    table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.grey), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke), ('ALIGN', (0,0), (-1,-1), 'CENTER'), ('GRID', (0,0), (-1,-1), 1, colors.black)]))
     story.append(table)
     story.append(Spacer(1, 0.2*inch))
     story.append(Paragraph(f"Всего записей: {len(data)}", styles['Normal']))
@@ -1108,12 +1032,7 @@ async def export_pdf(chat_id: int = None):
     doc.build(story)
     buffer.seek(0)
     
-    response = StreamingResponse(
-        buffer,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=chats_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"}
-    )
-    return response
+    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=chats_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"})
 
 @app.get("/api/export/period")
 async def export_period(from_date: str, to_date: str):
@@ -1140,26 +1059,14 @@ async def export_period(from_date: str, to_date: str):
                 created_date = created_at.date()
             else:
                 created_date = datetime.fromisoformat(str(created_at)).date()
-            
             if date_from.date() <= created_date <= date_to.date():
                 filtered_chats.append(chat)
     
     for chat in filtered_chats:
-        writer.writerow([
-            chat['id'], chat['user_id'], chat.get('full_name', ''),
-            chat.get('dialog_status', ''), chat.get('auto_mode', ''),
-            chat.get('utm_source', ''), chat.get('utm_campaign', ''),
-            chat.get('created_at', ''), chat.get('last_message_at', '')
-        ])
+        writer.writerow([chat['id'], chat['user_id'], chat.get('full_name', ''), chat.get('dialog_status', ''), chat.get('auto_mode', ''), chat.get('utm_source', ''), chat.get('utm_campaign', ''), chat.get('created_at', ''), chat.get('last_message_at', '')])
     
-    response = StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=chats_{from_date}_{to_date}.csv"}
-    )
-    return response
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=chats_{from_date}_{to_date}.csv"})
 
-# ==================== ШАБЛОНЫ ====================
 templates_storage = []
 
 @app.get("/api/templates")
@@ -1176,12 +1083,7 @@ async def create_template(request: Request):
         raise HTTPException(status_code=400, detail="Title and text are required")
     
     template_id = len(templates_storage) + 1
-    templates_storage.append({
-        "id": template_id,
-        "title": title,
-        "text": text,
-        "created_at": datetime.now().isoformat()
-    })
+    templates_storage.append({"id": template_id, "title": title, "text": text, "created_at": datetime.now().isoformat()})
     return {"id": template_id, "title": title, "text": text}
 
 @app.get("/dashboard", response_class=HTMLResponse)
