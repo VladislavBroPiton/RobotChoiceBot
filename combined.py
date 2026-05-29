@@ -45,18 +45,14 @@ start_time = time.time()
 # Глобальные переменные для текущего бота
 current_bot_token = DEFAULT_BOT_TOKEN
 current_bot_name = "RobotChoiceBot"
-bot = None  # Создаётся только в lifespan
-dp = None   # Создаётся только в lifespan
+bot = None  # НЕ СОЗДАЁМ БОТА СРАЗУ!
+dp = None   # НЕ СОЗДАЁМ ДИСПЕТЧЕР СРАЗУ!
 
 # Флаг для остановки polling
 polling_task = None
 is_polling_running = False
 
 # ==================== ОБРАБОТКА КОНФЛИКТА ЭКЗЕМПЛЯРОВ ====================
-# При деплое на Render старый и новый экземпляры пересекаются на 5-10 секунд.
-# Этот код убивает новый процесс при конфликте, и Render запускает его заново
-# уже после остановки старого экземпляра.
-
 import sys as _sys
 import signal as _signal
 
@@ -90,7 +86,6 @@ def parse_utm_from_start_param(start_param: str) -> dict:
         utm_data['utm_term'] = parts[4] if len(parts) > 4 else ''
         utm_data['utm_content'] = parts[5] if len(parts) > 5 else ''
         
-        # Логируем результат парсинга
         logger.info(f"✅ UTM parsed from '{start_param}': {utm_data}")
         return utm_data
     
@@ -122,6 +117,9 @@ class Database:
                 )
             ''')
             
+            # Добавляем колонку managed_by_crm (если её нет)
+            await conn.execute('ALTER TABLE bot_instances ADD COLUMN IF NOT EXISTS managed_by_crm BOOLEAN DEFAULT TRUE')
+            
             # Удаляем дубликаты ботов (оставляем только первого)
             await conn.execute('''
                 DELETE FROM bot_instances 
@@ -152,7 +150,6 @@ class Database:
                 )
             ''')
             
-            # Добавляем колонки в users (если их нет)
             await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
             await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_source TEXT')
             await conn.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS utm_medium TEXT')
@@ -177,10 +174,8 @@ class Database:
                 )
             ''')
             
-            # Добавляем колонку bot_id в таблицу chats (если её нет)
             await conn.execute('ALTER TABLE chats ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
             
-            # Обновляем существующие чаты (устанавливаем bot_id для старых записей)
             active_bot = await conn.fetchrow('SELECT id FROM bot_instances WHERE is_active = TRUE LIMIT 1')
             if active_bot:
                 await conn.execute('UPDATE chats SET bot_id = $1 WHERE bot_id IS NULL', active_bot['id'])
@@ -198,7 +193,7 @@ class Database:
                 )
             ''')
             
-            # Таблица для хранения истории UTM-меток (ВСЕ уникальные визиты)
+            # Таблица для хранения истории UTM-меток
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS user_sessions (
                     id SERIAL PRIMARY KEY,
@@ -229,10 +224,9 @@ class Database:
                 )
             ''')
             
-            # Добавляем колонку bot_id в crm_stats (если её нет)
             await conn.execute('ALTER TABLE crm_stats ADD COLUMN IF NOT EXISTS bot_id INTEGER REFERENCES bot_instances(id)')
             
-            # Создаём индексы
+            # Индексы
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_bot_id ON users(bot_id)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_chats_bot_id ON chats(bot_id)')
             await conn.execute('CREATE INDEX IF NOT EXISTS idx_users_utm_source ON users(utm_source)')
@@ -243,13 +237,11 @@ class Database:
             logger.info("✅ Таблицы созданы")
 
     async def get_active_bot(self):
-        """Получить активного бота"""
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('SELECT * FROM bot_instances WHERE is_active = TRUE LIMIT 1')
             return dict(row) if row else None
 
     async def set_active_bot(self, bot_id: int):
-        """Установить активного бота"""
         async with self.pool.acquire() as conn:
             await conn.execute('UPDATE bot_instances SET is_active = FALSE')
             await conn.execute('UPDATE bot_instances SET is_active = TRUE WHERE id = $1', bot_id)
@@ -257,9 +249,8 @@ class Database:
             return dict(row) if row else None
 
     async def get_all_bots(self):
-        """Получить всех ботов"""
         async with self.pool.acquire() as conn:
-            rows = await conn.fetch('SELECT id, name, bot_token, is_active FROM bot_instances ORDER BY id')
+            rows = await conn.fetch('SELECT id, name, bot_token, is_active, managed_by_crm FROM bot_instances ORDER BY id')
             return [dict(r) for r in rows]
 
     async def get_or_create_chat(self, user_id: int, username: str = None, 
@@ -268,15 +259,12 @@ class Database:
             active_bot = await self.get_active_bot()
             bot_id = active_bot['id'] if active_bot else 1
             
-            # Парсим UTM из start_param
             utm_data = parse_utm_from_start_param(start_param)
             logger.info(f"📊 Parsed UTM for user {user_id}: {utm_data}")
             
-            # Проверяем, существует ли пользователь
             existing_user = await conn.fetchrow('SELECT user_id FROM users WHERE user_id = $1', user_id)
             
             if existing_user:
-                # Пользователь существует — обновляем только активность и username
                 await conn.execute('''
                     UPDATE users 
                     SET username = $1, full_name = $2, last_active = NOW()
@@ -284,7 +272,6 @@ class Database:
                 ''', username, full_name, user_id)
                 logger.info(f"🔄 Updated existing user {user_id}")
             else:
-                # Новый пользователь — сохраняем с первыми UTM
                 await conn.execute('''
                     INSERT INTO users (user_id, username, full_name, bot_id,
                                        utm_source, utm_medium, utm_campaign, 
@@ -301,10 +288,8 @@ class Database:
                    utm_data.get('gclid'))
                 logger.info(f"✅ Created new user {user_id} with UTM: {utm_data}")
             
-            # Проверяем, нужно ли добавлять новую сессию (проверка среди ВСЕХ сессий)
             should_add_session = False
             
-            # Проверяем, была ли уже ТОЧНО ТАКАЯ ЖЕ комбинация UTM
             existing_session = await conn.fetchrow('''
                 SELECT id FROM user_sessions 
                 WHERE user_id = $1 
@@ -332,7 +317,6 @@ class Database:
             else:
                 logger.info(f"⏭️ Skipping duplicate UTM for user {user_id}: {utm_data}")
             
-            # Добавляем сессию если нужно
             if should_add_session:
                 await conn.execute('''
                     INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
@@ -350,7 +334,6 @@ class Database:
                    utm_data.get('gclid'))
                 logger.info(f"✅ Added new session for user {user_id}")
             
-            # Получаем или создаём чат
             row = await conn.fetchrow('SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2', user_id, bot_id)
             if row:
                 return dict(row)
@@ -384,7 +367,6 @@ class Database:
             return [dict(r) for r in reversed(rows)]
 
     async def get_client_message_count(self, chat_id: int) -> int:
-        """Получить количество последних сообщений подряд от клиента"""
         async with self.pool.acquire() as conn:
             rows = await conn.fetch('''
                 SELECT sender_type FROM messages 
@@ -422,7 +404,6 @@ class Database:
             return [dict(r) for r in rows]
 
     async def search_chats(self, search_query: str = None, status_filter: str = None, limit: int = 100):
-        """Умный поиск чатов по имени, username, ID или тексту сообщения"""
         async with self.pool.acquire() as conn:
             active_bot = await self.get_active_bot()
             bot_id = active_bot['id'] if active_bot else 1
@@ -438,13 +419,11 @@ class Database:
             params = [bot_id]
             param_counter = 2
             
-            # Фильтр по статусу
             if status_filter and status_filter != 'all':
                 query += f' AND c.dialog_status = ${param_counter}'
                 params.append(status_filter)
                 param_counter += 1
             
-            # Умный поиск
             if search_query and search_query.strip():
                 search_term = f'%{search_query.strip()}%'
                 query += f''' AND (
@@ -454,7 +433,7 @@ class Database:
                     OR m.message_text ILIKE ${param_counter}
                 )'''
                 params.append(search_term)
-                params.append(search_query.strip())  # для точного совпадения ID
+                params.append(search_query.strip())
                 param_counter += 2
             
             query += f' ORDER BY c.last_message_at DESC LIMIT ${param_counter}'
@@ -464,7 +443,6 @@ class Database:
             return [dict(r) for r in rows]
 
     async def get_chat_with_utm(self, chat_id: int):
-        """Получить чат с полными UTM-метками пользователя (первые UTM)"""
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow('''
                 SELECT c.*, u.username, u.full_name, u.user_id,
@@ -477,7 +455,6 @@ class Database:
             return dict(row) if row else None
     
     async def get_user_sessions(self, user_id: int):
-        """Получить историю всех UTM-сессий пользователя"""
         async with self.pool.acquire() as conn:
             rows = await conn.fetch('''
                 SELECT utm_source, utm_medium, utm_campaign, utm_term, utm_content,
@@ -582,7 +559,6 @@ async def update_bot_instance(new_token: str, new_name: str):
         except asyncio.CancelledError:
             pass
     
-    # Сбрасываем старые соединения для нового токена
     current_bot_token = new_token
     current_bot_name = new_name
     
@@ -752,10 +728,8 @@ def register_handlers():
         await db.save_message(chat_data['id'], 'user', message.text, message.document.file_id if message.document else None)
         
         if chat_data['auto_mode']:
-            # Получаем количество сообщений подряд от клиента
             client_message_count = await db.get_client_message_count(chat_data['id'])
             
-            # Отправляем ответ только после 3 сообщений подряд
             if client_message_count >= 3:
                 response = (
                     "✅ *Ваше сообщение получено!*\n\n"
@@ -787,7 +761,6 @@ def register_handlers():
 async def lifespan(app: FastAPI):
     global polling_task, is_polling_running, bot, dp
     
-    # Увеличенная пауза для гарантированного завершения старых процессов
     logger.info("⏳ Waiting for old processes to terminate...")
     await asyncio.sleep(5)
     
@@ -801,8 +774,9 @@ async def lifespan(app: FastAPI):
         else:
             logger.error("❌ Failed to create bot in lifespan")
     
-    # Запускаем polling с дополнительной проверкой
-    if bot and not is_polling_running:
+        # Проверяем, управляет ли CRM активным ботом
+    active_bot = await db.get_active_bot()
+    if active_bot and active_bot.get('managed_by_crm', True) and bot and not is_polling_running:
         # Принудительно удаляем вебхук перед стартом
         try:
             await bot.delete_webhook(drop_pending_updates=True)
@@ -818,14 +792,13 @@ async def lifespan(app: FastAPI):
                 try:
                     logger.info(f"🔄 Starting polling (attempt {attempt + 1}/{max_retries})")
                     await dp.start_polling(bot)
-                    break  # Если успешно запустились, выходим из цикла
+                    break
                 except Exception as e:
                     logger.error(f"❌ Polling error (attempt {attempt + 1}): {e}")
                     if attempt < max_retries - 1:
-                        wait_time = 2 ** attempt  # Экспоненциальная задержка: 1, 2, 4, 8 секунд
+                        wait_time = 2 ** attempt
                         logger.info(f"⏳ Waiting {wait_time}s before retry...")
                         await asyncio.sleep(wait_time)
-                        # Пробуем сбросить соединение перед повторной попыткой
                         try:
                             await bot.delete_webhook(drop_pending_updates=True)
                             await asyncio.sleep(1)
@@ -836,6 +809,13 @@ async def lifespan(app: FastAPI):
         
         polling_task = asyncio.create_task(run_polling())
         logger.info("🤖 Бот запущен в режиме Long Polling")
+    elif active_bot and not active_bot.get('managed_by_crm', True):
+        logger.info(f"👁️ Активный бот '{active_bot['name']}' в режиме только просмотр — polling не запущен")
+        
+        polling_task = asyncio.create_task(run_polling())
+        logger.info("🤖 Бот запущен в режиме Long Polling")
+    elif active_bot and not active_bot.get('managed_by_crm', True):
+        logger.info(f"👁️ Активный бот '{active_bot['name']}' в режиме только просмотр — polling не запущен")
     
     yield
     
@@ -871,13 +851,11 @@ app.add_middleware(
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Корневой маршрут - перенаправление на дашборд
 @app.get("/")
 @app.head("/")
 async def root():
     return RedirectResponse(url="/dashboard")
 
-# Эндпоинт вебхука больше не нужен для бота, но оставим для совместимости
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
     return {"ok": False, "description": "Webhook disabled, use polling"}
@@ -886,20 +864,17 @@ async def telegram_webhook(request: Request):
 async def health():
     return {"status": "ok"}
 
-# ==================== ЭНДПОИНТ ДЛЯ МОНИТОРИНГА РЕСУРСОВ ====================
+# ==================== МОНИТОРИНГ ====================
 @app.get("/api/metrics")
 async def get_metrics():
-    """Эндпоинт для отслеживания использования CPU и памяти сервера"""
     process = psutil.Process()
     memory_info = process.memory_info()
     
-    # Получаем системную информацию
     cpu_percent = psutil.cpu_percent(interval=0.5)
     memory_mb = memory_info.rss / 1024 / 1024
     memory_percent = process.memory_percent()
     uptime_seconds = time.time() - start_time
     
-    # Форматируем uptime в читаемый вид
     uptime_days = int(uptime_seconds // 86400)
     uptime_hours = int((uptime_seconds % 86400) // 3600)
     uptime_minutes = int((uptime_seconds % 3600) // 60)
@@ -937,6 +912,7 @@ async def get_metrics():
         }
     }
 
+# ==================== API БОТОВ ====================
 @app.get("/api/bots")
 async def get_bots():
     bots = await db.get_all_bots()
@@ -951,10 +927,21 @@ async def switch_bot(request: Request):
     if not bot_data:
         raise HTTPException(status_code=404, detail="Bot not found")
     
-    await update_bot_instance(bot_data['bot_token'], bot_data['name'])
+    # Запускаем polling только если CRM управляет этим ботом
+    if bot_data.get('managed_by_crm', True):
+        await update_bot_instance(bot_data['bot_token'], bot_data['name'])
+    else:
+        global current_bot_name
+        current_bot_name = bot_data['name']
+        logger.info(f"📊 Переключён контекст на наблюдаемого бота: {current_bot_name}")
     
-    return {"status": "switched", "bot_name": bot_data['name']}
+    return {
+        "status": "switched", 
+        "bot_name": bot_data['name'],
+        "managed_by_crm": bot_data.get('managed_by_crm', True)
+    }
 
+# ==================== API ЧАТОВ ====================
 @app.get("/api/chats")
 async def get_chats(limit: int = 50, offset: int = 0, status: str = None):
     chats = await db.get_all_chats(limit, offset, status)
@@ -966,7 +953,6 @@ async def search_chats_endpoint(
     status: str = Query(None, description="Фильтр по статусу"),
     limit: int = Query(100, description="Лимит результатов")
 ):
-    """Умный поиск чатов"""
     chats = await db.search_chats(search_query=q, status_filter=status, limit=limit)
     return {"chats": chats, "total": len(chats)}
 
@@ -979,7 +965,6 @@ async def get_chat(chat_id: int):
 
 @app.get("/api/chats/{chat_id}/full")
 async def get_chat_full(chat_id: int):
-    """Получить чат с полными UTM-метками пользователя (первые UTM)"""
     chat = await db.get_chat_with_utm(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
@@ -987,7 +972,6 @@ async def get_chat_full(chat_id: int):
 
 @app.get("/api/users/{user_id}/sessions")
 async def get_user_sessions(user_id: int):
-    """Получить историю всех UTM-сессий пользователя"""
     sessions = await db.get_user_sessions(user_id)
     return {"sessions": sessions}
 
@@ -1047,6 +1031,7 @@ async def delete_message(message_id: int):
         
         return {"status": "deleted"}
 
+# ==================== API СТАТИСТИКИ И ЭКСПОРТА ====================
 @app.get("/api/utm_stats")
 async def get_utm_stats():
     stats = await db.get_utm_stats()
@@ -1174,6 +1159,7 @@ async def export_period(from_date: str, to_date: str):
     )
     return response
 
+# ==================== ШАБЛОНЫ ====================
 templates_storage = []
 
 @app.get("/api/templates")
