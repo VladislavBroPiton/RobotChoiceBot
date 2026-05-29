@@ -112,6 +112,7 @@ let currentActionsMessageId = null;
 let pendingNewMessages = 0;
 let isUserAtBottom = true;
 let scrollTimeout = null;
+let currentBotManagedByCrm = true; // По умолчанию бот управляется CRM
 
 // ========== ОПРЕДЕЛЕНИЕ МОБИЛЬНОГО УСТРОЙСТВА ==========
 function isMobile() {
@@ -130,6 +131,46 @@ function updateCrmTitle(botName) {
     }
 }
 
+// ========== ФУНКЦИЯ ОБНОВЛЕНИЯ СТАТУСА УПРАВЛЕНИЯ БОТОМ ==========
+function updateBotManagedStatus(bot) {
+    const statusEl = document.getElementById('botManagedStatus');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    
+    if (!statusEl) return;
+    
+    if (bot && bot.managed_by_crm === false) {
+        currentBotManagedByCrm = false;
+        statusEl.textContent = '👁️ Только просмотр (бот на своём сервере)';
+        statusEl.style.color = 'var(--text-muted)';
+        statusEl.style.display = 'block';
+        
+        if (messageInput) {
+            messageInput.setAttribute('disabled', 'true');
+            messageInput.setAttribute('placeholder', 'Этот бот управляется другим сервером');
+        }
+        if (sendBtn) {
+            sendBtn.setAttribute('disabled', 'true');
+            sendBtn.style.opacity = '0.5';
+            sendBtn.style.cursor = 'not-allowed';
+        }
+    } else {
+        currentBotManagedByCrm = true;
+        statusEl.textContent = '';
+        statusEl.style.display = 'none';
+        
+        if (messageInput) {
+            messageInput.removeAttribute('disabled');
+            messageInput.setAttribute('placeholder', 'Написать сообщение...');
+        }
+        if (sendBtn) {
+            sendBtn.removeAttribute('disabled');
+            sendBtn.style.opacity = '1';
+            sendBtn.style.cursor = 'pointer';
+        }
+    }
+}
+
 // ========== ЗАГРУЗКА БОТОВ ==========
 async function loadBots() {
     try {
@@ -139,12 +180,13 @@ async function loadBots() {
         
         if (data.bots && data.bots.length) {
             selector.innerHTML = data.bots.map(bot => 
-                `<option value="${bot.id}" ${bot.is_active ? 'selected' : ''}>${bot.name}</option>`
+                `<option value="${bot.id}" ${bot.is_active ? 'selected' : ''}>${bot.name}${bot.managed_by_crm === false ? ' 👁️' : ''}</option>`
             ).join('');
             
             const activeBot = data.bots.find(bot => bot.is_active);
             if (activeBot) {
                 updateCrmTitle(activeBot.name);
+                updateBotManagedStatus(activeBot);
             }
         } else {
             selector.innerHTML = '<option value="">Нет ботов</option>';
@@ -165,6 +207,15 @@ async function switchBot(botId) {
         if (res.ok) {
             const data = await res.json();
             updateCrmTitle(data.bot_name);
+            
+            // Обновляем статус управления ботом
+            const botsRes = await fetch('/api/bots');
+            const botsData = await botsRes.json();
+            const activeBot = botsData.bots.find(b => b.is_active);
+            if (activeBot) {
+                updateBotManagedStatus(activeBot);
+            }
+            
             currentChatId = null;
             document.getElementById('messagesArea').style.display = 'none';
             await loadChats();
@@ -198,11 +249,9 @@ function switchTab(tabId) {
         const chatsTab = document.getElementById('chatsTab');
         if (chatsTab) {
             chatsTab.classList.add('active');
-            // Восстанавливаем отображение области сообщений, если был выбран чат
             if (currentChatId) {
                 document.getElementById('messagesArea').style.display = 'flex';
             }
-            // На мобильных показываем сайдбар
             if (isMobile()) {
                 const sidebar = document.getElementById('chatsSidebar');
                 sidebar.classList.remove('mobile-hidden');
@@ -219,7 +268,6 @@ function switchTab(tabId) {
     }
     
     if (tabId === 'utm') {
-        // Скрываем область сообщений
         document.getElementById('messagesArea').style.display = 'none';
         loadUtmStats();
     }
@@ -543,6 +591,10 @@ async function pinMessage(messageId, text) {
 
 async function resendMessage(messageId, text) {
     if (!currentChatId) return;
+    if (!currentBotManagedByCrm) {
+        showToast('❌ Нельзя отправлять сообщения от имени этого бота');
+        return;
+    }
     const res = await fetch(`/api/chats/${currentChatId}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -553,7 +605,6 @@ async function resendMessage(messageId, text) {
 }
 
 async function deleteMessage(messageId) {
-    // Даём браузеру завершить текущий клик
     await new Promise(resolve => setTimeout(resolve, 100));
     
     if (!confirm('Удалить это сообщение?')) return;
@@ -977,6 +1028,11 @@ function getStatusIcon(status) {
 
 // ========== ОТПРАВКА СООБЩЕНИЯ ==========
 async function sendMessage() {
+    if (!currentBotManagedByCrm) {
+        showToast('❌ Нельзя отправлять сообщения от имени этого бота');
+        return;
+    }
+    
     const input = document.getElementById('messageInput');
     const text = input.value.trim();
     if (!text || !currentChatId) return;
@@ -1019,6 +1075,10 @@ async function updateStatus() {
 // ========== АВТОРЕЖИМ ==========
 async function toggleAutoMode() {
     if (!currentChatId) return;
+    if (!currentBotManagedByCrm) {
+        showToast('❌ Нельзя изменять режим для этого бота');
+        return;
+    }
     const res = await fetch(`/api/chats/${currentChatId}/toggle-auto`, { method: 'POST' });
     if (res.ok) {
         currentAutoMode = !currentAutoMode;
@@ -1057,6 +1117,10 @@ function renderTemplatesList() {
 }
 
 window.useTemplate = function(templateId) {
+    if (!currentBotManagedByCrm) {
+        showToast('❌ Нельзя отправлять сообщения от имени этого бота');
+        return;
+    }
     const template = templates.find(t => t.id === templateId);
     if (template && currentChatId) {
         document.getElementById('messageInput').value = template.text;
