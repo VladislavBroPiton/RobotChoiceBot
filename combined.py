@@ -862,9 +862,20 @@ async def lifespan(app: FastAPI):
         else:
             logger.error("❌ Failed to create bot in lifespan")
     
-    active_bot = await db.get_active_bot()
-    if active_bot and active_bot.get('managed_by_crm', True) and bot and not is_polling_running:
-        logger.info(f"🤖 Активный бот '{active_bot['name']}' управляется CRM — запускаем polling")
+    # Ищем бота с managed_by_crm = TRUE для запуска polling
+    async with db.pool.acquire() as conn:
+        managed_bot = await conn.fetchrow(
+            "SELECT * FROM bot_instances WHERE managed_by_crm = TRUE LIMIT 1"
+        )
+    
+    if managed_bot and bot and not is_polling_running:
+        logger.info(f"🤖 Бот '{managed_bot['name']}' управляется CRM — запускаем polling")
+        
+        # Создаём бота с правильным токеном
+        bot = Bot(token=managed_bot['bot_token'])
+        dp = Dispatcher(storage=MemoryStorage())
+        register_handlers()
+        
         try:
             await bot.delete_webhook(drop_pending_updates=True)
             logger.info("✅ Webhook deleted before polling start")
@@ -896,8 +907,8 @@ async def lifespan(app: FastAPI):
         
         polling_task = asyncio.create_task(run_polling())
         logger.info("🤖 Бот запущен в режиме Long Polling")
-    elif active_bot and not active_bot.get('managed_by_crm', True):
-        logger.info(f"👁️ Активный бот '{active_bot['name']}' в режиме только просмотр — polling не запущен")
+    else:
+        logger.info("👁️ Нет ботов с managed_by_crm = TRUE — polling не запущен")
     
     yield
     
