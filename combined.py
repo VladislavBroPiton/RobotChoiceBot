@@ -596,34 +596,38 @@ def register_handlers():
                     "UPDATE users SET username = $1, full_name = $2, last_active = NOW() WHERE user_id = $3",
                     user.username, user.full_name, user.id
                 )
-                # Обновляем UTM-метки и сохраняем сессию для существующего пользователя
-                if utm_data.get('utm_source'):
-                    await conn.execute('''
-                        UPDATE users SET 
-                            utm_source = $1, utm_medium = $2, utm_campaign = $3,
-                            utm_content = $4, utm_term = $5, start_param = $6
-                        WHERE user_id = $7
-                    ''', 
-                       utm_data.get('utm_source'),
-                       utm_data.get('utm_medium'),
-                       utm_data.get('utm_campaign'),
-                       utm_data.get('utm_content'),
-                       utm_data.get('utm_term'),
-                       utm_data.get('start_param', start_param),
-                       user.id)
+                # UTM-метки НЕ обновляем — остаются первые касания
+                
+                # Проверяем, была ли уже такая же комбинация UTM
+                if utm_data:
+                    existing_session = await conn.fetchrow('''
+                        SELECT id FROM user_sessions 
+                        WHERE user_id = $1 
+                        AND COALESCE(utm_source, '') = $2
+                        AND COALESCE(utm_medium, '') = $3
+                        AND COALESCE(utm_campaign, '') = $4
+                        AND COALESCE(utm_term, '') = $5
+                        AND COALESCE(utm_content, '') = $6
+                        LIMIT 1
+                    ''', user.id,
+                       utm_data.get('utm_source', ''),
+                       utm_data.get('utm_medium', ''),
+                       utm_data.get('utm_campaign', ''),
+                       utm_data.get('utm_term', ''),
+                       utm_data.get('utm_content', ''))
                     
-                    # Сохраняем новую сессию
-                    await conn.execute('''
-                        INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
-                                                   utm_campaign, utm_content, utm_term, start_param)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                    ''', user.id, bot_id,
-                       utm_data.get('utm_source'),
-                       utm_data.get('utm_medium'),
-                       utm_data.get('utm_campaign'),
-                       utm_data.get('utm_content'),
-                       utm_data.get('utm_term'),
-                       utm_data.get('start_param', start_param))
+                    if not existing_session:
+                        await conn.execute('''
+                            INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
+                                                       utm_campaign, utm_content, utm_term, start_param)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                        ''', user.id, bot_id,
+                           utm_data.get('utm_source'),
+                           utm_data.get('utm_medium'),
+                           utm_data.get('utm_campaign'),
+                           utm_data.get('utm_content'),
+                           utm_data.get('utm_term'),
+                           utm_data.get('start_param', start_param))
             else:
                 await conn.execute('''
                     INSERT INTO users (user_id, username, full_name, bot_id,
