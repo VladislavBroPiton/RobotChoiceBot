@@ -652,6 +652,11 @@ def register_handlers():
                        utm_data.get('utm_term'),
                        utm_data.get('start_param', start_param))
             
+            utm_user = await conn.fetchrow(
+                "SELECT utm_source, utm_medium, utm_campaign, utm_content, utm_term FROM users WHERE user_id = $1",
+                user.id
+            )
+            
             chat_row = await conn.fetchrow(
                 "SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2",
                 user.id, bot_id
@@ -675,7 +680,6 @@ def register_handlers():
         if start_param:
             logger.info(f"New user {user.id} from: {start_param}")
         
-        # Основное меню
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📊 Посмотреть услуги", callback_data="services")],
             [InlineKeyboardButton(text="💬 Связаться с менеджером", callback_data="contact_manager")]
@@ -693,12 +697,6 @@ def register_handlers():
         
         await message.answer(welcome_text, reply_markup=keyboard, parse_mode="Markdown")
         await db.save_message(chat_id, 'bot', welcome_text)
-        
-        # Формируем ссылку на регистрацию с UTM-метками
-        utm_user = await conn.fetchrow(
-            "SELECT utm_source, utm_medium, utm_campaign, utm_content, utm_term FROM users WHERE user_id = $1",
-            user.id
-        )
         
         base_url = "https://mynpb.nl/lprureg"
         utm_params = [f"tg_user_id={user.id}"]
