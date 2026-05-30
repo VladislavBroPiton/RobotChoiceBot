@@ -572,6 +572,16 @@ async def update_bot_instance(new_token: str, new_name: str):
 def register_handlers():
     @dp.message(Command("start"))
     async def cmd_start(message: types.Message):
+        user = message.from_user
+        start_param = message.text.replace('/start', '').strip()
+        if start_param.startswith(' '):
+            start_param = start_param[1:]
+        if start_param == '':
+            start_param = None
+        
+        # Парсим UTM
+        utm_data = parse_utm_from_start_param(start_param) if start_param else {}
+        
         async with db.pool.acquire() as conn:
             bot_row = await conn.fetchrow(
                 "SELECT * FROM bot_instances WHERE bot_token = $1",
@@ -581,13 +591,6 @@ def register_handlers():
                 return
             bot_id = bot_row['id']
             
-            user = message.from_user
-            start_param = message.text.replace('/start', '').strip()
-            if start_param.startswith(' '):
-                start_param = start_param[1:]
-            if start_param == '':
-                start_param = None
-            
             existing_user = await conn.fetchrow("SELECT user_id FROM users WHERE user_id = $1", user.id)
             if existing_user:
                 await conn.execute(
@@ -595,10 +598,33 @@ def register_handlers():
                     user.username, user.full_name, user.id
                 )
             else:
-                await conn.execute(
-                    "INSERT INTO users (user_id, username, full_name, bot_id) VALUES ($1, $2, $3, $4)",
-                    user.id, user.username, user.full_name, bot_id
-                )
+                # Сохраняем с UTM-метками
+                await conn.execute('''
+                    INSERT INTO users (user_id, username, full_name, bot_id,
+                                       utm_source, utm_medium, utm_campaign, 
+                                       utm_content, utm_term, start_param)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                ''', user.id, user.username, user.full_name, bot_id,
+                   utm_data.get('utm_source'),
+                   utm_data.get('utm_medium'),
+                   utm_data.get('utm_campaign'),
+                   utm_data.get('utm_content'),
+                   utm_data.get('utm_term'),
+                   utm_data.get('start_param', start_param))
+                
+                # Сохраняем сессию
+                if utm_data:
+                    await conn.execute('''
+                        INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
+                                                   utm_campaign, utm_content, utm_term, start_param)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    ''', user.id, bot_id,
+                       utm_data.get('utm_source'),
+                       utm_data.get('utm_medium'),
+                       utm_data.get('utm_campaign'),
+                       utm_data.get('utm_content'),
+                       utm_data.get('utm_term'),
+                       utm_data.get('start_param', start_param))
             
             chat_row = await conn.fetchrow(
                 "SELECT * FROM chats WHERE user_id = $1 AND bot_id = $2",
