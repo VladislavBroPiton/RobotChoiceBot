@@ -596,9 +596,6 @@ def register_handlers():
                     "UPDATE users SET username = $1, full_name = $2, last_active = NOW() WHERE user_id = $3",
                     user.username, user.full_name, user.id
                 )
-                # UTM-метки НЕ обновляем — остаются первые касания
-                
-                # Проверяем, была ли уже такая же комбинация UTM
                 if utm_data:
                     existing_session = await conn.fetchrow('''
                         SELECT id FROM user_sessions 
@@ -678,6 +675,7 @@ def register_handlers():
         if start_param:
             logger.info(f"New user {user.id} from: {start_param}")
         
+        # Основное меню
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📊 Посмотреть услуги", callback_data="services")],
             [InlineKeyboardButton(text="💬 Связаться с менеджером", callback_data="contact_manager")]
@@ -695,6 +693,34 @@ def register_handlers():
         
         await message.answer(welcome_text, reply_markup=keyboard, parse_mode="Markdown")
         await db.save_message(chat_id, 'bot', welcome_text)
+        
+        # Формируем ссылку на регистрацию с UTM-метками
+        utm_user = await conn.fetchrow(
+            "SELECT utm_source, utm_medium, utm_campaign, utm_content, utm_term FROM users WHERE user_id = $1",
+            user.id
+        )
+        
+        base_url = "https://mynpb.nl/lprureg"
+        utm_params = [f"tg_user_id={user.id}"]
+        
+        if utm_user:
+            if utm_user['utm_source']:
+                utm_params.append(f"utm_source={utm_user['utm_source']}")
+            if utm_user['utm_medium']:
+                utm_params.append(f"utm_medium={utm_user['utm_medium']}")
+            if utm_user['utm_campaign']:
+                utm_params.append(f"utm_campaign={utm_user['utm_campaign']}")
+            if utm_user['utm_content']:
+                utm_params.append(f"utm_content={utm_user['utm_content']}")
+            if utm_user['utm_term']:
+                utm_params.append(f"utm_term={utm_user['utm_term']}")
+        
+        registration_url = base_url + "?" + "&".join(utm_params)
+        
+        reg_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📝 Зарегистрироваться на сайте", url=registration_url)]
+        ])
+        await message.answer("🔗 Для регистрации на сайте перейдите по ссылке:", reply_markup=reg_keyboard)
 
     @dp.callback_query()
     async def handle_callback(callback: types.CallbackQuery):
@@ -1095,6 +1121,22 @@ async def get_chat_full(chat_id: int):
 async def get_user_sessions(user_id: int):
     sessions = await db.get_user_sessions(user_id)
     return {"sessions": sessions}
+
+@app.get("/api/users/{user_id}/utm")
+async def get_user_utm(user_id: int):
+    """Получить UTM-метки пользователя (для сайта регистрации)"""
+    async with db.pool.acquire() as conn:
+        user = await conn.fetchrow(
+            """SELECT user_id, username, full_name, 
+                      utm_source, utm_medium, utm_campaign, 
+                      utm_content, utm_term, start_param,
+                      first_seen, last_active
+               FROM users WHERE user_id = $1""",
+            user_id
+        )
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return dict(user)
 
 @app.get("/api/chats/{chat_id}/messages")
 async def get_messages(chat_id: int, limit: int = 100):
