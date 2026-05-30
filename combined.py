@@ -596,7 +596,7 @@ def register_handlers():
                     "UPDATE users SET username = $1, full_name = $2, last_active = NOW() WHERE user_id = $3",
                     user.username, user.full_name, user.id
                 )
-                # Обновляем UTM-метки для существующего пользователя
+                # Обновляем UTM-метки и сохраняем сессию для существующего пользователя
                 if utm_data.get('utm_source'):
                     await conn.execute('''
                         UPDATE users SET 
@@ -611,6 +611,19 @@ def register_handlers():
                        utm_data.get('utm_term'),
                        utm_data.get('start_param', start_param),
                        user.id)
+                    
+                    # Сохраняем новую сессию
+                    await conn.execute('''
+                        INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
+                                                   utm_campaign, utm_content, utm_term, start_param)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    ''', user.id, bot_id,
+                       utm_data.get('utm_source'),
+                       utm_data.get('utm_medium'),
+                       utm_data.get('utm_campaign'),
+                       utm_data.get('utm_content'),
+                       utm_data.get('utm_term'),
+                       utm_data.get('start_param', start_param))
             else:
                 await conn.execute('''
                     INSERT INTO users (user_id, username, full_name, bot_id,
