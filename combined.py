@@ -195,6 +195,22 @@ class Database:
                 )
             ''')
             
+            # Новая таблица событий пользователей
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS user_events (
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT REFERENCES users(user_id),
+                    bot_id INTEGER REFERENCES bot_instances(id),
+                    chat_id INTEGER REFERENCES chats(id),
+                    event_type VARCHAR(50) NOT NULL,
+                    event_data JSONB DEFAULT '{}',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            ''')
+            
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_events_user_id ON user_events(user_id)')
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_events_type ON user_events(event_type)')
+            
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS crm_stats (
                     id SERIAL PRIMARY KEY,
@@ -676,6 +692,42 @@ def register_handlers():
                 "UPDATE chats SET last_message_at = NOW() AT TIME ZONE 'Europe/Moscow' WHERE id = $1",
                 chat_id
             )
+            
+            # Формируем ссылку на регистрацию
+            base_url = "https://mynpb.nl/lprureg"
+            utm_params = [f"tg_user_id={user.id}"]
+            
+            if utm_user:
+                if utm_user['utm_source']:
+                    utm_params.append(f"utm_source={utm_user['utm_source']}")
+                if utm_user['utm_medium']:
+                    utm_params.append(f"utm_medium={utm_user['utm_medium']}")
+                if utm_user['utm_campaign']:
+                    utm_params.append(f"utm_campaign={utm_user['utm_campaign']}")
+                if utm_user['utm_content']:
+                    utm_params.append(f"utm_content={utm_user['utm_content']}")
+                if utm_user['utm_term']:
+                    utm_params.append(f"utm_term={utm_user['utm_term']}")
+            
+            registration_url = base_url + "?" + "&".join(utm_params)
+            
+            # Записываем событие показа ссылки
+            await conn.execute('''
+                INSERT INTO user_events (user_id, bot_id, chat_id, event_type, event_data)
+                VALUES ($1, $2, $3, $4, $5::jsonb)
+            ''', user.id, bot_id, chat_id, 'registration_link_shown',
+                json.dumps({
+                    "url": registration_url,
+                    "utm_source": utm_user['utm_source'] if utm_user else None,
+                    "utm_medium": utm_user['utm_medium'] if utm_user else None,
+                    "utm_campaign": utm_user['utm_campaign'] if utm_user else None
+                }))
+            
+            # Обновляем теги чата
+            await conn.execute(
+                "UPDATE chats SET tags = CASE WHEN tags IS NULL THEN 'registration_link_shown' ELSE tags || ',registration_link_shown' END WHERE id = $1",
+                chat_id
+            )
         
         if start_param:
             logger.info(f"New user {user.id} from: {start_param}")
@@ -697,23 +749,6 @@ def register_handlers():
         
         await message.answer(welcome_text, reply_markup=keyboard, parse_mode="Markdown")
         await db.save_message(chat_id, 'bot', welcome_text)
-        
-        base_url = "https://mynpb.nl/lprureg"
-        utm_params = [f"tg_user_id={user.id}"]
-        
-        if utm_user:
-            if utm_user['utm_source']:
-                utm_params.append(f"utm_source={utm_user['utm_source']}")
-            if utm_user['utm_medium']:
-                utm_params.append(f"utm_medium={utm_user['utm_medium']}")
-            if utm_user['utm_campaign']:
-                utm_params.append(f"utm_campaign={utm_user['utm_campaign']}")
-            if utm_user['utm_content']:
-                utm_params.append(f"utm_content={utm_user['utm_content']}")
-            if utm_user['utm_term']:
-                utm_params.append(f"utm_term={utm_user['utm_term']}")
-        
-        registration_url = base_url + "?" + "&".join(utm_params)
         
         reg_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📝 Зарегистрироваться на сайте", url=registration_url)]
@@ -1135,6 +1170,72 @@ async def get_user_utm(user_id: int):
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return dict(user)
+
+@app.post("/api/events/register")
+async def register_event(request: Request):
+    """Записать событие (клик по ссылке, регистрация и т.д.)"""
+    data = await request.json()
+    user_id = data.get("user_id")
+    event_type = data.get("event_type")
+    event_data = data.get("event_data", {})
+    bot_id = data.get("bot_id")
+    
+    if not user_id or not event_type:
+        raise HTTPException(status_code=400, detail="user_id and event_type are required")
+    
+    async with db.pool.acquire() as conn:
+        if not bot_id:
+            active_bot = await db.get_active_bot()
+            bot_id = active_bot['id'] if active_bot else 1
+        
+        chat_row = await conn.fetchrow(
+            "SELECT id FROM chats WHERE user_id = $1 AND bot_id = $2 LIMIT 1",
+            user_id, bot_id
+        )
+        chat_id = chat_row['id'] if chat_row else None
+        
+        await conn.execute('''
+            INSERT INTO user_events (user_id, bot_id, chat_id, event_type, event_data)
+            VALUES ($1, $2, $3, $4, $5::jsonb)
+        ''', user_id, bot_id, chat_id, event_type, json.dumps(event_data))
+        
+        if chat_id:
+            current_tags = await conn.fetchval("SELECT tags FROM chats WHERE id = $1", chat_id)
+            new_tag = f"event_{event_type}"
+            if current_tags:
+                tags_list = current_tags.split(',')
+                if new_tag not in tags_list:
+                    tags_list.append(new_tag)
+                new_tags = ','.join(tags_list)
+            else:
+                new_tags = new_tag
+            
+            await conn.execute("UPDATE chats SET tags = $1 WHERE id = $2", new_tags, chat_id)
+        
+        return {"status": "ok", "event_type": event_type, "chat_id": chat_id}
+
+@app.get("/api/users/{user_id}/events")
+async def get_user_events(user_id: int):
+    """Получить историю событий пользователя"""
+    async with db.pool.acquire() as conn:
+        rows = await conn.fetch('''
+            SELECT id, event_type, event_data, created_at
+            FROM user_events
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            LIMIT 50
+        ''', user_id)
+        
+        events = []
+        for row in rows:
+            event = dict(row)
+            if event['event_data']:
+                event['event_data'] = json.loads(event['event_data']) if isinstance(event['event_data'], str) else event['event_data']
+            if event['created_at']:
+                event['created_at'] = event['created_at'].isoformat()
+            events.append(event)
+        
+        return {"events": events}
 
 @app.get("/api/chats/{chat_id}/messages")
 async def get_messages(chat_id: int, limit: int = 100):
