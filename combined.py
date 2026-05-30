@@ -579,7 +579,6 @@ def register_handlers():
         if start_param == '':
             start_param = None
         
-        # Парсим UTM
         utm_data = parse_utm_from_start_param(start_param) if start_param else {}
         
         async with db.pool.acquire() as conn:
@@ -597,8 +596,22 @@ def register_handlers():
                     "UPDATE users SET username = $1, full_name = $2, last_active = NOW() WHERE user_id = $3",
                     user.username, user.full_name, user.id
                 )
+                # Обновляем UTM-метки для существующего пользователя
+                if utm_data.get('utm_source'):
+                    await conn.execute('''
+                        UPDATE users SET 
+                            utm_source = $1, utm_medium = $2, utm_campaign = $3,
+                            utm_content = $4, utm_term = $5, start_param = $6
+                        WHERE user_id = $7
+                    ''', 
+                       utm_data.get('utm_source'),
+                       utm_data.get('utm_medium'),
+                       utm_data.get('utm_campaign'),
+                       utm_data.get('utm_content'),
+                       utm_data.get('utm_term'),
+                       utm_data.get('start_param', start_param),
+                       user.id)
             else:
-                # Сохраняем с UTM-метками
                 await conn.execute('''
                     INSERT INTO users (user_id, username, full_name, bot_id,
                                        utm_source, utm_medium, utm_campaign, 
@@ -612,7 +625,6 @@ def register_handlers():
                    utm_data.get('utm_term'),
                    utm_data.get('start_param', start_param))
                 
-                # Сохраняем сессию
                 if utm_data:
                     await conn.execute('''
                         INSERT INTO user_sessions (user_id, bot_id, utm_source, utm_medium, 
@@ -888,7 +900,6 @@ async def lifespan(app: FastAPI):
         else:
             logger.error("❌ Failed to create bot in lifespan")
     
-    # Ищем бота с managed_by_crm = TRUE для запуска polling
     async with db.pool.acquire() as conn:
         managed_bot = await conn.fetchrow(
             "SELECT * FROM bot_instances WHERE managed_by_crm = TRUE LIMIT 1"
@@ -897,7 +908,6 @@ async def lifespan(app: FastAPI):
     if managed_bot and bot and not is_polling_running:
         logger.info(f"🤖 Бот '{managed_bot['name']}' управляется CRM — запускаем polling")
         
-        # Создаём бота с правильным токеном
         bot = Bot(token=managed_bot['bot_token'])
         dp = Dispatcher(storage=MemoryStorage())
         register_handlers()
